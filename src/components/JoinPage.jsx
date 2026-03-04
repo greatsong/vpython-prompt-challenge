@@ -72,6 +72,12 @@ export default function JoinPage() {
         return
       }
 
+      // 관람 모드
+      if (data.spectator) {
+        navigate(`/spectator/${data.sessionId}`)
+        return
+      }
+
       if (data.alreadyRegistered) {
         navigate(`/team/${data.teamId}`)
         return

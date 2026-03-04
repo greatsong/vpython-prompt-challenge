@@ -55,6 +55,8 @@ router.post('/:id/teams', (req, res) => {
   res.json({ teams })
 })
 
+const MAX_TEAMS = 15
+
 // POST /api/session/register — 학생 자기 등록 (학번 + 이름 + 수업코드)
 router.post('/register', (req, res) => {
   const { teacherCode, studentNumber, studentName } = req.body
@@ -72,8 +74,11 @@ router.post('/register', (req, res) => {
     .prepare('SELECT id, team_id FROM students WHERE session_id = ? AND student_number = ?')
     .get(session.id, studentNumber.trim())
   if (existing) {
-    // 이미 등록된 학생 → 기존 팀으로 보내기
-    return res.json({ sessionId: session.id, teamId: existing.team_id, alreadyRegistered: true })
+    if (existing.team_id) {
+      return res.json({ sessionId: session.id, teamId: existing.team_id, alreadyRegistered: true })
+    }
+    // 관람자로 재접속
+    return res.json({ sessionId: session.id, teamId: null, spectator: true, alreadyRegistered: true })
   }
 
   const teamColors = [
@@ -83,19 +88,35 @@ router.post('/register', (req, res) => {
     '#6366f1','#a855f7',
   ]
 
-  // 빈자리 있는 팀 찾기 (멤버 1명인 팀)
   const teams = req.db
     .prepare('SELECT * FROM teams WHERE session_id = ?')
     .all(session.id)
 
-  let teamId = null
+  // 빈자리 있는 팀 찾기 (멤버 1명인 팀)
   const incompleteTeam = teams.find(t => {
     const members = JSON.parse(t.members)
     return members.length < 2
   })
 
+  // 15팀 제한: 빈자리도 없고 팀도 꽉 찼으면 관람 모드
+  if (!incompleteTeam && teams.length >= MAX_TEAMS) {
+    // 관람자로 등록 (team_id = null)
+    req.db
+      .prepare('INSERT INTO students (session_id, team_id, student_number, name) VALUES (?, NULL, ?, ?)')
+      .run(session.id, studentNumber.trim(), studentName.trim())
+
+    req.io.to(`session:${session.id}:teacher`).emit('student:registered', {
+      studentNumber: studentNumber.trim(),
+      studentName: studentName.trim(),
+      team: { name: '관람자', color: '#64748b', members: [] },
+    })
+
+    return res.json({ sessionId: session.id, teamId: null, spectator: true })
+  }
+
+  let teamId = null
+
   if (incompleteTeam) {
-    // 기존 팀에 합류
     const members = JSON.parse(incompleteTeam.members)
     members.push(studentName.trim())
     req.db
@@ -103,7 +124,6 @@ router.post('/register', (req, res) => {
       .run(JSON.stringify(members), incompleteTeam.id)
     teamId = incompleteTeam.id
   } else {
-    // 새 팀 생성
     const name = generateTeamName()
     const color = teamColors[teams.length % teamColors.length]
     const result = req.db
@@ -112,12 +132,10 @@ router.post('/register', (req, res) => {
     teamId = result.lastInsertRowid
   }
 
-  // 학생 레코드 생성
   req.db
     .prepare('INSERT INTO students (session_id, team_id, student_number, name) VALUES (?, ?, ?, ?)')
     .run(session.id, teamId, studentNumber.trim(), studentName.trim())
 
-  // Socket.io로 교사에게 알림
   const team = req.db.prepare('SELECT * FROM teams WHERE id = ?').get(teamId)
   req.io.to(`session:${session.id}:teacher`).emit('student:registered', {
     studentNumber: studentNumber.trim(),

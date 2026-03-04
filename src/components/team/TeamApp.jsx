@@ -193,7 +193,6 @@ export default function TeamApp() {
       <ChatPanel
         socket={socketRef}
         sessionId={myTeam.session_id}
-        teamId={myTeam.id}
         teamName={myTeam.name}
         teamColor={myTeam.color}
         members={myTeam.members}

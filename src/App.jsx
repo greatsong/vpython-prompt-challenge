@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import TeacherApp from './components/teacher/TeacherApp.jsx'
 import TeamApp from './components/team/TeamApp.jsx'
 import JoinPage from './components/JoinPage.jsx'
+import SpectatorPage from './components/SpectatorPage.jsx'
 
 export default function App() {
   return (
@@ -15,6 +16,9 @@ export default function App() {
 
         {/* 팀 화면 */}
         <Route path="/team/:teamId" element={<TeamApp />} />
+
+        {/* 관람 모드 */}
+        <Route path="/spectator/:sessionId" element={<SpectatorPage />} />
 
         {/* 루트: 학생용 join 화면으로 */}
         <Route path="/" element={<Navigate to="/join" replace />} />

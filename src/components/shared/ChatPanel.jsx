@@ -1,85 +1,50 @@
 import { useState, useEffect, useRef } from 'react'
 
-const CHAT_TABS = [
-  { key: 'all', label: '전체 채팅', emoji: '🌐' },
-  { key: 'team', label: '팀 채팅', emoji: '🤝' },
-]
-
-export default function ChatPanel({ socket, sessionId, teamId, teamName, teamColor, members }) {
+export default function ChatPanel({ socket, sessionId, teamName, teamColor, members }) {
   const [open, setOpen] = useState(false)
-  const [tab, setTab] = useState('all')
   const [input, setInput] = useState('')
-  const [allMessages, setAllMessages] = useState([])
-  const [teamMessages, setTeamMessages] = useState([])
-  const [unread, setUnread] = useState({ all: 0, team: 0 })
+  const [messages, setMessages] = useState([])
+  const [unread, setUnread] = useState(0)
   const scrollRef = useRef(null)
   const sender = (members || []).join(' · ') || teamName
 
-  // 소켓 이벤트 리스너
   useEffect(() => {
     const s = socket?.current
     if (!s) return
 
-    const handleAll = (msg) => {
-      setAllMessages((prev) => [...prev, msg])
-      if (!open || tab !== 'all') {
-        setUnread((u) => ({ ...u, all: u.all + 1 }))
-      }
+    const handleMsg = (msg) => {
+      setMessages((prev) => [...prev, msg])
+      if (!open) setUnread((u) => u + 1)
     }
 
-    const handleTeam = (msg) => {
-      setTeamMessages((prev) => [...prev, msg])
-      if (!open || tab !== 'team') {
-        setUnread((u) => ({ ...u, team: u.team + 1 }))
-      }
-    }
+    s.on('chat:all', handleMsg)
+    return () => s.off('chat:all', handleMsg)
+  }, [socket?.current, open])
 
-    s.on('chat:all', handleAll)
-    s.on('chat:team', handleTeam)
-    return () => {
-      s.off('chat:all', handleAll)
-      s.off('chat:team', handleTeam)
-    }
-  }, [socket?.current, open, tab])
-
-  // 스크롤 맨 아래로
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
-  }, [allMessages, teamMessages, tab])
+  }, [messages])
 
-  // 탭 변경 시 unread 리셋
   useEffect(() => {
-    if (open) setUnread((u) => ({ ...u, [tab]: 0 }))
-  }, [tab, open])
+    if (open) setUnread(0)
+  }, [open])
 
   const handleSend = () => {
     const s = socket?.current
     if (!s || !input.trim()) return
-
-    if (tab === 'all') {
-      s.emit('chat:all', {
-        sessionId, teamName, teamColor,
-        sender, message: input.trim(),
-      })
-    } else {
-      s.emit('chat:team', {
-        sessionId, teamId,
-        sender, message: input.trim(),
-      })
-    }
+    s.emit('chat:all', {
+      sessionId, teamName, teamColor,
+      sender, message: input.trim(),
+    })
     setInput('')
   }
 
-  const messages = tab === 'all' ? allMessages : teamMessages
-  const totalUnread = unread.all + unread.team
-
-  // 닫힌 상태: 플로팅 버튼
   if (!open) {
     return (
       <button
-        onClick={() => { setOpen(true); setUnread((u) => ({ ...u, [tab]: 0 })) }}
+        onClick={() => setOpen(true)}
         style={{
           position: 'fixed',
           bottom: '20px',
@@ -103,7 +68,7 @@ export default function ChatPanel({ socket, sessionId, teamId, teamName, teamCol
         onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
       >
         💬
-        {totalUnread > 0 && (
+        {unread > 0 && (
           <span style={{
             position: 'absolute',
             top: '-4px',
@@ -120,14 +85,13 @@ export default function ChatPanel({ socket, sessionId, teamId, teamName, teamCol
             justifyContent: 'center',
             animation: 'bounceIn 0.3s ease-out',
           }}>
-            {totalUnread > 9 ? '9+' : totalUnread}
+            {unread > 9 ? '9+' : unread}
           </span>
         )}
       </button>
     )
   }
 
-  // 열린 상태: 채팅 패널
   return (
     <div style={{
       position: 'fixed',
@@ -152,38 +116,8 @@ export default function ChatPanel({ socket, sessionId, teamId, teamName, teamCol
         borderBottom: '1px solid var(--border)',
         display: 'flex',
         alignItems: 'center',
-        gap: '8px',
       }}>
-        {CHAT_TABS.map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            style={{
-              padding: '6px 12px',
-              background: tab === t.key ? 'var(--accent)' : 'transparent',
-              color: tab === t.key ? 'white' : 'var(--text-muted)',
-              border: 'none',
-              borderRadius: 'var(--radius)',
-              fontSize: '0.8125rem',
-              fontWeight: 600,
-              cursor: 'pointer',
-              position: 'relative',
-            }}
-          >
-            {t.emoji} {t.label}
-            {unread[t.key] > 0 && tab !== t.key && (
-              <span style={{
-                position: 'absolute',
-                top: '-2px',
-                right: '-2px',
-                width: '8px',
-                height: '8px',
-                borderRadius: '50%',
-                background: 'var(--danger)',
-              }} />
-            )}
-          </button>
-        ))}
+        <span style={{ fontWeight: 700, fontSize: '0.875rem' }}>💬 전체 채팅</span>
         <button
           onClick={() => setOpen(false)}
           style={{
@@ -200,7 +134,7 @@ export default function ChatPanel({ socket, sessionId, teamId, teamName, teamCol
         </button>
       </div>
 
-      {/* 메시지 영역 */}
+      {/* 메시지 */}
       <div
         ref={scrollRef}
         style={{
@@ -219,7 +153,7 @@ export default function ChatPanel({ socket, sessionId, teamId, teamName, teamCol
             fontSize: '0.8125rem',
             marginTop: '40px',
           }}>
-            {tab === 'all' ? '🌐 전체 학생에게 메시지를 보내보세요!' : '🤝 팀원에게 메시지를 보내보세요!'}
+            전체 학생에게 메시지를 보내보세요!
           </p>
         )}
         {messages.map((msg, i) => {
@@ -229,8 +163,7 @@ export default function ChatPanel({ socket, sessionId, teamId, teamName, teamCol
               alignSelf: isMe ? 'flex-end' : 'flex-start',
               maxWidth: '80%',
             }}>
-              {/* 보낸 사람 이름 (전체 채팅에서만, 남의 메시지만) */}
-              {tab === 'all' && !isMe && (
+              {!isMe && (
                 <div style={{
                   fontSize: '0.6875rem',
                   color: msg.teamColor || 'var(--text-muted)',
@@ -273,7 +206,7 @@ export default function ChatPanel({ socket, sessionId, teamId, teamName, teamCol
         })}
       </div>
 
-      {/* 입력 영역 */}
+      {/* 입력 */}
       <div style={{
         padding: '10px 12px',
         borderTop: '1px solid var(--border)',
@@ -284,7 +217,7 @@ export default function ChatPanel({ socket, sessionId, teamId, teamName, teamCol
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-          placeholder={tab === 'all' ? '전체에게 메시지...' : '팀에게 메시지...'}
+          placeholder="메시지 입력..."
           style={{
             flex: 1,
             padding: '8px 12px',
