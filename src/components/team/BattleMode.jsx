@@ -135,6 +135,19 @@ export default function BattleMode({ team, socket, rankings }) {
         <h2 style={{ fontSize: '1.125rem', fontWeight: 700 }}>
           {currentChallenge.emoji} {currentChallenge.title}
         </h2>
+        {currentChallenge.shapes && (
+          <p style={{
+            marginTop: '6px',
+            fontSize: '0.8125rem',
+            color: 'var(--text-muted)',
+            background: 'var(--bg)',
+            padding: '4px 10px',
+            borderRadius: 'var(--radius)',
+            display: 'inline-block',
+          }}>
+            사용된 도형: {currentChallenge.shapes.join(', ')}
+          </p>
+        )}
         {hint && (
           <p style={{ marginTop: '8px', fontSize: '0.875rem', color: 'var(--warning)' }}>
             💡 힌트: {hint}

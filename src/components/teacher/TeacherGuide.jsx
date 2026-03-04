@@ -1,8 +1,13 @@
 import { useState } from 'react'
 import { BATTLE_CHALLENGES } from '../../data/challenges-battle.js'
+import VPythonRunner from '../shared/VPythonRunner.jsx'
+import { generateCode } from '../../utils/claude.js'
+
+const LS_API_KEY = 'vpython_api_key'
 
 const sections = [
   { id: 'overview', icon: '🌍', label: '서비스 소개' },
+  { id: 'tryit', icon: '🎮', label: '직접 체험하기' },
   { id: 'howto', icon: '🚀', label: '수업 진행 방법' },
   { id: 'challenges', icon: '🎯', label: '챌린지 구성' },
   { id: 'tips', icon: '💡', label: '운영 팁' },
@@ -61,6 +66,7 @@ export default function TeacherGuide() {
         maxWidth: '900px',
       }}>
         {activeSection === 'overview' && <OverviewSection />}
+        {activeSection === 'tryit' && <TryItSection />}
         {activeSection === 'howto' && <HowtoSection />}
         {activeSection === 'challenges' && <ChallengesSection />}
         {activeSection === 'tips' && <TipsSection />}
@@ -69,6 +75,40 @@ export default function TeacherGuide() {
     </div>
   )
 }
+
+/* ─── 연습 문제 데이터 (실제 챌린지 뱅크와 별도) ────────────────── */
+const PRACTICE_CHALLENGES = [
+  {
+    level: 1,
+    emoji: '🟡',
+    title: '노란 원뿔',
+    description: '위를 향해 뾰족하게 솟은 노란색 원뿔',
+    code: `cone({pos: vec(0,-1,0), axis: vec(0,3,0), radius: 1.2, color: color.yellow});`,
+    hint: '원뿔이 어느 방향으로 뾰족한지, 색상은 무엇인지 묘사해보세요.',
+  },
+  {
+    level: 2,
+    emoji: '⛄',
+    title: '눈사람',
+    description: '흰 구 3개가 아래에서 위로 점점 작아지며 쌓여 있고, 주황색 당근 코가 달려 있다',
+    code: `sphere({pos: vec(0,-1.5,0), radius: 1.2, color: color.white});
+sphere({pos: vec(0,0.3,0), radius: 0.9, color: color.white});
+sphere({pos: vec(0,1.7,0), radius: 0.6, color: color.white});
+cone({pos: vec(0,1.7,0), axis: vec(0,0,0.8), radius: 0.12, color: color.orange});`,
+    hint: '몸통은 몇 개의 구로 이루어져 있나요? 크기는 어떻게 변하나요?',
+  },
+  {
+    level: 3,
+    emoji: '🗼',
+    title: '색깔 탑',
+    description: '빨-주-노-초-파 5가지 색 상자가 아래에서 위로 차례대로 쌓여 있다',
+    code: `var colors = [color.red, color.orange, color.yellow, color.green, color.blue];
+for (var i = 0; i < 5; i++) {
+    box({pos: vec(0, i*1.1-2, 0), size: vec(1, 1, 1), color: colors[i]});
+}`,
+    hint: '상자는 몇 개이고, 어떤 색 순서로 쌓여 있나요? 규칙을 찾아보세요.',
+  },
+]
 
 /* ─── 섹션 컴포넌트들 ─────────────────────────────────── */
 
@@ -112,27 +152,16 @@ function OverviewSection() {
         <StatCard emoji="⏱️" label="수업 시간" value="100분" />
       </div>
 
-      {/* 기술 구성 */}
-      <SectionTitle>작동 원리</SectionTitle>
-      <Card>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-          <TechItem icon="🎨" label="3D 렌더링" value="GlowScript (VPython 웹 버전)" />
-          <TechItem icon="🤖" label="AI 코드 생성" value="Claude Haiku 4.5" />
-          <TechItem icon="📊" label="AI 평가" value="Claude Sonnet 4.6" />
-          <TechItem icon="📡" label="실시간 통신" value="Socket.io" />
-        </div>
-      </Card>
-
       {/* 수업 흐름 다이어그램 */}
       <SectionTitle>수업 흐름</SectionTitle>
       <Card>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
           {[
-            { emoji: '📝', label: '학생이\n프롬프트 작성' },
-            { emoji: '🤖', label: 'AI가\n코드 생성' },
-            { emoji: '🎨', label: '3D 장면\n렌더링' },
-            { emoji: '📊', label: 'AI가\n점수 평가' },
-            { emoji: '🔄', label: '피드백 후\n재도전' },
+            { emoji: '👀', label: '목표 장면\n관찰하기' },
+            { emoji: '📝', label: '프롬프트\n작성하기' },
+            { emoji: '🎨', label: 'AI가\n3D 장면 생성' },
+            { emoji: '📊', label: '점수 확인\n피드백 받기' },
+            { emoji: '🔄', label: '프롬프트\n수정 후 재도전' },
           ].map((step, i) => (
             <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               {i > 0 && <span style={{ fontSize: '1.25rem', color: '#cbd5e1' }}>→</span>}
@@ -154,6 +183,215 @@ function OverviewSection() {
   )
 }
 
+function TryItSection() {
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem(LS_API_KEY) || '')
+  const [keySaved, setKeySaved] = useState(() => !!localStorage.getItem(LS_API_KEY))
+  const [selected, setSelected] = useState(0)
+  const [prompt, setPrompt] = useState('')
+  const [resultCode, setResultCode] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+
+  const challenge = PRACTICE_CHALLENGES[selected]
+
+  const saveKey = () => {
+    if (!apiKey.trim()) return
+    localStorage.setItem(LS_API_KEY, apiKey.trim())
+    setKeySaved(true)
+  }
+
+  const handleSubmit = async () => {
+    if (!prompt.trim()) return
+    if (!keySaved) return setError('API 키를 먼저 저장해주세요.')
+    setLoading(true)
+    setError(null)
+    setResultCode(null)
+    try {
+      const { code } = await generateCode(prompt.trim())
+      setResultCode(code)
+    } catch (e) {
+      setError(e.message || 'AI 요청 실패')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div>
+      <SectionTitle>직접 체험하기</SectionTitle>
+      <p style={{ fontSize: '0.9375rem', lineHeight: 1.7, color: '#475569', marginBottom: '20px' }}>
+        학생들이 수업에서 경험할 활동을 직접 체험해보세요.
+        아래 연습 문제는 실제 수업에서 사용되는 문제와 다르지만, 난이도와 형식은 동일합니다.
+      </p>
+
+      {/* API 키 입력 */}
+      <Card>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+          <span style={{ fontSize: '1.25rem' }}>🔑</span>
+          <span style={{ fontWeight: 600, fontSize: '0.9375rem', color: '#1e293b' }}>Anthropic API 키</span>
+          {keySaved && <span style={{ fontSize: '0.75rem', color: '#22c55e', fontWeight: 600 }}>저장됨</span>}
+        </div>
+        <p style={{ fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '10px' }}>
+          여기서 입력한 API 키는 수업 시작 시에도 자동으로 사용됩니다.
+        </p>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <input
+            type="password"
+            value={apiKey}
+            onChange={e => { setApiKey(e.target.value); setKeySaved(false) }}
+            placeholder="sk-ant-..."
+            style={{
+              flex: 1,
+              padding: '8px 12px',
+              border: '1px solid #e2e8f0',
+              borderRadius: '8px',
+              fontSize: '0.875rem',
+              fontFamily: 'monospace',
+              outline: 'none',
+            }}
+          />
+          <button
+            onClick={saveKey}
+            style={{
+              padding: '8px 20px',
+              background: keySaved ? '#22c55e' : '#6366f1',
+              color: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '0.875rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            {keySaved ? '저장됨' : '저장'}
+          </button>
+        </div>
+      </Card>
+
+      {/* 레벨 선택 탭 */}
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+        {PRACTICE_CHALLENGES.map((c, i) => (
+          <button
+            key={i}
+            onClick={() => { setSelected(i); setPrompt(''); setResultCode(null); setError(null) }}
+            style={{
+              flex: 1,
+              padding: '12px 14px',
+              border: selected === i ? '2px solid #6366f1' : '1px solid #e2e8f0',
+              background: selected === i ? '#eef2ff' : 'white',
+              borderRadius: '12px',
+              cursor: 'pointer',
+              textAlign: 'center',
+            }}
+          >
+            <div style={{ fontSize: '1.5rem', marginBottom: '4px' }}>{c.emoji}</div>
+            <div style={{ fontSize: '0.75rem', fontWeight: 600, color: selected === i ? '#6366f1' : '#64748b' }}>
+              Lv.{c.level}
+            </div>
+            <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#1e293b' }}>{c.title}</div>
+          </button>
+        ))}
+      </div>
+
+      {/* 목표 장면 + 프롬프트 입력 */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+        {/* 목표 장면 */}
+        <div>
+          <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            목표 장면
+          </div>
+          <div style={{ background: '#1a1a2e', borderRadius: '12px', overflow: 'hidden', height: '280px' }}>
+            <VPythonRunner code={challenge.code} height="280px" />
+          </div>
+          <div style={{
+            marginTop: '8px',
+            padding: '10px 14px',
+            background: '#fffbeb',
+            borderLeft: '3px solid #f59e0b',
+            borderRadius: '0 8px 8px 0',
+            fontSize: '0.8125rem',
+            color: '#92400e',
+          }}>
+            💡 {challenge.hint}
+          </div>
+        </div>
+
+        {/* 내 결과 */}
+        <div>
+          <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            내 프롬프트 결과
+          </div>
+          <div style={{ background: '#1a1a2e', borderRadius: '12px', overflow: 'hidden', height: '280px', position: 'relative' }}>
+            {resultCode ? (
+              <VPythonRunner code={resultCode} height="280px" />
+            ) : (
+              <div style={{
+                position: 'absolute', inset: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: '#64748b', fontSize: '0.875rem',
+              }}>
+                프롬프트를 제출하면 결과가 여기에 표시됩니다
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* 프롬프트 입력 + 제출 */}
+      <Card>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end' }}>
+          <div style={{ flex: 1 }}>
+            <label style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#475569', display: 'block', marginBottom: '6px' }}>
+              목표 장면을 말로 설명해보세요
+            </label>
+            <textarea
+              value={prompt}
+              onChange={e => setPrompt(e.target.value)}
+              placeholder={`예: "${challenge.description}"`}
+              rows={3}
+              style={{
+                width: '100%',
+                padding: '10px 14px',
+                border: '1px solid #e2e8f0',
+                borderRadius: '10px',
+                fontSize: '0.9375rem',
+                lineHeight: 1.6,
+                resize: 'vertical',
+                outline: 'none',
+                fontFamily: 'inherit',
+                boxSizing: 'border-box',
+              }}
+            />
+          </div>
+          <button
+            onClick={handleSubmit}
+            disabled={loading || !prompt.trim()}
+            style={{
+              padding: '12px 28px',
+              background: loading ? '#94a3b8' : '#6366f1',
+              color: 'white',
+              border: 'none',
+              borderRadius: '10px',
+              fontSize: '0.9375rem',
+              fontWeight: 700,
+              cursor: loading ? 'not-allowed' : 'pointer',
+              whiteSpace: 'nowrap',
+              marginBottom: '2px',
+            }}
+          >
+            {loading ? '생성 중...' : '제출'}
+          </button>
+        </div>
+        {error && (
+          <div style={{ marginTop: '10px', padding: '10px 14px', background: '#fef2f2', borderRadius: '8px', fontSize: '0.8125rem', color: '#dc2626' }}>
+            {error}
+          </div>
+        )}
+      </Card>
+    </div>
+  )
+}
+
 function HowtoSection() {
   return (
     <div>
@@ -162,7 +400,7 @@ function HowtoSection() {
       <StepCard num={1} color="#6366f1" title="세션 생성">
         <ol style={listStyle}>
           <li><code style={codeStyle}>/teacher</code> 경로로 접속합니다.</li>
-          <li>Anthropic API 키를 입력합니다. (수업 중 AI 기능에 필요)</li>
+          <li>Anthropic API 키를 입력합니다. (안내서 체험에서 입력했다면 자동 적용됩니다)</li>
           <li>교사 코드(간단한 암호)를 설정합니다.</li>
           <li>"세션 시작" 버튼을 누르면 수업 세션이 생성됩니다.</li>
         </ol>
@@ -185,8 +423,8 @@ function HowtoSection() {
         <ol style={listStyle}>
           <li>"수업 진행" 탭으로 이동합니다.</li>
           <li>왼쪽 사이드바에서 챌린지를 선택하고 "시작" 버튼을 누릅니다.</li>
-          <li>학생 화면에 목표 장면이 표시됩니다.</li>
-          <li>학생들이 프롬프트를 입력하면 AI가 코드를 생성하고 3D로 렌더링합니다.</li>
+          <li>학생 화면에 목표 3D 장면이 표시됩니다.</li>
+          <li>학생들이 장면을 관찰하고 프롬프트를 작성하여 제출합니다.</li>
           <li>AI가 목표 장면과 비교하여 점수를 매깁니다. (100점 만점)</li>
           <li>학생은 여러 번 재시도할 수 있습니다.</li>
         </ol>
@@ -334,19 +572,19 @@ function FAQSection() {
   const faqs = [
     {
       q: 'API 키는 어디서 받나요?',
-      a: 'Anthropic 콘솔(console.anthropic.com)에서 API 키를 생성할 수 있습니다. 수업에서 AI 코드 생성과 평가 기능을 사용하려면 반드시 필요합니다.',
+      a: 'Anthropic 콘솔(console.anthropic.com)에서 API 키를 생성할 수 있습니다. 안내서의 "직접 체험하기"에서 키를 입력하면 수업 시작 시에도 자동 적용됩니다.',
     },
     {
       q: 'API 비용은 얼마나 드나요?',
-      a: '1회 수업(15팀 × 평균 10회 제출) 기준 약 $1~2 정도입니다. Haiku 4.5(코드 생성)는 매우 저렴하고, Sonnet 4.6(평가)이 비용의 대부분을 차지합니다.',
+      a: '1회 수업(15팀 × 평균 10회 제출) 기준 약 $1~2 정도입니다.',
     },
     {
       q: '인터넷 없이 사용할 수 있나요?',
-      a: '서버는 교사 노트북에서 로컬로 실행되므로 학교 내부 네트워크만 있으면 됩니다. 단, AI 기능(프롬프트 → 코드 생성, 평가)은 Anthropic API 호출이 필요하므로 인터넷 연결이 필요합니다.',
+      a: '학교 내부 네트워크만 있으면 학생들이 접속할 수 있습니다. 단, AI 기능은 외부 API 호출이 필요하므로 교사 기기는 인터넷에 연결되어야 합니다.',
     },
     {
       q: '학생이 부적절한 프롬프트를 입력하면?',
-      a: 'AI 모델에 시스템 프롬프트가 설정되어 있어 VPython 3D 객체 코드만 생성합니다. 채팅 모니터링으로 실시간 확인도 가능합니다.',
+      a: '3D 장면 관련 프롬프트만 처리되도록 설계되어 있습니다. 채팅 모니터링으로 실시간 확인도 가능합니다.',
     },
     {
       q: '팀을 미리 지정할 수 있나요?',
@@ -354,7 +592,7 @@ function FAQSection() {
     },
     {
       q: '수업 데이터는 어디에 저장되나요?',
-      a: '서버의 SQLite 데이터베이스에 저장됩니다. 팀별 프롬프트, 점수, 시도 횟수가 모두 기록되며 CSV로 내보낼 수 있습니다.',
+      a: '서버의 데이터베이스에 저장됩니다. 팀별 프롬프트, 점수, 시도 횟수가 모두 기록되며 CSV로 내보낼 수 있습니다.',
     },
     {
       q: '한 세션에서 여러 챌린지를 진행할 수 있나요?',
@@ -447,18 +685,6 @@ function StatCard({ emoji, label, value }) {
       <div style={{ fontSize: '1.5rem', marginBottom: '4px' }}>{emoji}</div>
       <div style={{ fontSize: '0.6875rem', color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</div>
       <div style={{ fontSize: '1.125rem', fontWeight: 700, color: '#1e293b', marginTop: '2px' }}>{value}</div>
-    </div>
-  )
-}
-
-function TechItem({ icon, label, value }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: '#f8fafc', borderRadius: '10px' }}>
-      <span style={{ fontSize: '1.25rem' }}>{icon}</span>
-      <div>
-        <div style={{ fontSize: '0.6875rem', color: '#94a3b8', fontWeight: 600 }}>{label}</div>
-        <div style={{ fontSize: '0.875rem', color: '#334155', fontWeight: 500 }}>{value}</div>
-      </div>
     </div>
   )
 }
