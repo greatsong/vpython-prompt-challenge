@@ -20,6 +20,10 @@ export default function ClassDashboard({ sessionId }) {
 
   // 최근 등록 학생 알림
   const [recentStudent, setRecentStudent] = useState(null)
+  // 채팅 모니터링
+  const [showChat, setShowChat] = useState(false)
+  const [chatMessages, setChatMessages] = useState([])
+  const chatScrollRef = useRef(null)
 
   const loadTeams = async () => {
     const res = await fetch(`/api/dashboard/${sessionId}`)
@@ -44,8 +48,20 @@ export default function ClassDashboard({ sessionId }) {
       setTimeout(() => setRecentStudent(null), 4000)
     })
 
+    // 전체 채팅 모니터링
+    socket.on('chat:all', (msg) => {
+      setChatMessages((prev) => [...prev.slice(-99), msg])
+    })
+
     return () => socket.disconnect()
   }, [sessionId])
+
+  // 채팅 스크롤
+  useEffect(() => {
+    if (chatScrollRef.current) {
+      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight
+    }
+  }, [chatMessages])
 
   const handleReveal = () => {
     socketRef.current?.emit('challenge:reveal', { sessionId })
@@ -101,6 +117,28 @@ export default function ClassDashboard({ sessionId }) {
         </div>
 
         <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            onClick={() => setShowChat(!showChat)}
+            style={{
+              padding: '8px 16px',
+              background: showChat ? 'var(--accent)' : 'var(--surface2)',
+              color: showChat ? 'white' : 'var(--text)',
+              border: 'none',
+              borderRadius: 'var(--radius)',
+              fontSize: '0.875rem',
+              cursor: 'pointer',
+              position: 'relative',
+            }}
+          >
+            💬 채팅
+            {chatMessages.length > 0 && !showChat && (
+              <span style={{
+                position: 'absolute', top: '-4px', right: '-4px',
+                width: '10px', height: '10px', borderRadius: '50%',
+                background: 'var(--danger)',
+              }} />
+            )}
+          </button>
           <button
             onClick={() => { setShowDemo(!showDemo); setCompareTeams([]) }}
             style={{
@@ -385,6 +423,61 @@ export default function ClassDashboard({ sessionId }) {
                 </div>
               )
             })}
+          </div>
+        </div>
+      )}
+      {/* 전체 채팅 모니터링 패널 */}
+      {showChat && (
+        <div style={{
+          marginTop: '24px',
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--radius-lg)',
+          padding: '20px',
+        }}>
+          <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '12px' }}>
+            💬 전체 채팅 모니터링
+          </h3>
+          <div
+            ref={chatScrollRef}
+            style={{
+              maxHeight: '300px',
+              overflowY: 'auto',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px',
+            }}
+          >
+            {chatMessages.length === 0 && (
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.8125rem', textAlign: 'center', padding: '20px' }}>
+                아직 채팅 메시지가 없습니다
+              </p>
+            )}
+            {chatMessages.map((msg, i) => (
+              <div key={i} style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '8px',
+                padding: '6px 10px',
+                background: 'var(--bg)',
+                borderRadius: 'var(--radius)',
+                borderLeft: `3px solid ${msg.teamColor || 'var(--border)'}`,
+              }}>
+                <span style={{
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  color: msg.teamColor || 'var(--text-muted)',
+                  whiteSpace: 'nowrap',
+                  minWidth: '80px',
+                }}>
+                  {msg.teamName}
+                </span>
+                <span style={{ fontSize: '0.8125rem', flex: 1 }}>{msg.message}</span>
+                <span style={{ fontSize: '0.625rem', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                  {new Date(msg.timestamp).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </div>
+            ))}
           </div>
         </div>
       )}

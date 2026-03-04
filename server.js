@@ -128,6 +128,23 @@ io.on('connection', (socket) => {
     io.to(`session:${sessionId}`).emit('dashboard:update', {})
   })
 
+  // ── 채팅 ──────────────────────────────────────────────────────────────────
+  // 전체 채팅
+  socket.on('chat:all', ({ sessionId, teamName, teamColor, sender, message }) => {
+    io.to(`session:${sessionId}`).emit('chat:all', {
+      teamName, teamColor, sender, message,
+      timestamp: Date.now(),
+    })
+  })
+
+  // 팀 채팅
+  socket.on('chat:team', ({ sessionId, teamId, sender, message }) => {
+    io.to(`session:${sessionId}:team:${teamId}`).emit('chat:team', {
+      sender, message,
+      timestamp: Date.now(),
+    })
+  })
+
   socket.on('disconnect', () => {
     console.log(`[Socket] 해제: ${socket.id}`)
   })

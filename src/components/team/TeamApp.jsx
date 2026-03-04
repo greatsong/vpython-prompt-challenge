@@ -4,6 +4,7 @@ import { createSocket } from '../../utils/socket.js'
 import useSessionStore from '../../store/sessionStore.js'
 import useTeamStore from '../../store/teamStore.js'
 import BattleMode from './BattleMode.jsx'
+import ChatPanel from '../shared/ChatPanel.jsx'
 
 const WELCOME_MESSAGES = [
   '오늘의 챌린지를 정복해보세요!',
@@ -187,6 +188,16 @@ export default function TeamApp() {
       <main>
         <BattleMode team={myTeam} socket={socketRef} rankings={rankings} />
       </main>
+
+      {/* 채팅 패널 */}
+      <ChatPanel
+        socket={socketRef}
+        sessionId={myTeam.session_id}
+        teamId={myTeam.id}
+        teamName={myTeam.name}
+        teamColor={myTeam.color}
+        members={myTeam.members}
+      />
     </div>
   )
 }
