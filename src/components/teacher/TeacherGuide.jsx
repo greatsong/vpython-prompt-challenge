@@ -1,29 +1,29 @@
 import { useState } from 'react'
+import { BATTLE_CHALLENGES } from '../../data/challenges-battle.js'
 
 const sections = [
-  { id: 'overview', icon: '🧠', label: '서비스 소개' },
-  { id: 'curriculum', icon: '📚', label: '커리큘럼' },
-  { id: 'howto', icon: '🎮', label: '수업 진행 방법' },
+  { id: 'overview', icon: '🌍', label: '서비스 소개' },
+  { id: 'howto', icon: '🚀', label: '수업 진행 방법' },
   { id: 'challenges', icon: '🎯', label: '챌린지 구성' },
   { id: 'tips', icon: '💡', label: '운영 팁' },
-  { id: 'faq', icon: '❓', label: 'FAQ' },
+  { id: 'faq', icon: '💬', label: 'FAQ' },
 ]
 
 export default function TeacherGuide() {
   const [activeSection, setActiveSection] = useState('overview')
 
   return (
-    <div style={{ display: 'flex', minHeight: 'calc(100vh - 52px)' }}>
+    <div style={{ display: 'flex', minHeight: 'calc(100vh - 52px)', background: '#f8fafc' }}>
       {/* 사이드 내비게이션 */}
       <nav style={{
-        width: '200px',
-        background: 'var(--surface)',
-        borderRight: '1px solid var(--border)',
-        padding: '20px 0',
+        width: '210px',
+        background: 'white',
+        borderRight: '1px solid #e2e8f0',
+        padding: '24px 0',
         flexShrink: 0,
         overflowY: 'auto',
       }}>
-        <div style={{ padding: '0 16px 16px', fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+        <div style={{ padding: '0 20px 20px', fontSize: '0.7rem', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
           교사 안내서
         </div>
         {sections.map(s => (
@@ -33,20 +33,21 @@ export default function TeacherGuide() {
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '8px',
+              gap: '10px',
               width: '100%',
-              padding: '10px 16px',
+              padding: '11px 20px',
               border: 'none',
-              background: activeSection === s.id ? 'var(--accent)' : 'transparent',
-              color: activeSection === s.id ? 'white' : 'var(--text-muted)',
-              fontWeight: activeSection === s.id ? 600 : 400,
+              background: activeSection === s.id ? 'linear-gradient(135deg, #6366f1, #8b5cf6)' : 'transparent',
+              color: activeSection === s.id ? 'white' : '#64748b',
+              fontWeight: activeSection === s.id ? 600 : 500,
               fontSize: '0.875rem',
               cursor: 'pointer',
               textAlign: 'left',
-              transition: 'background 0.15s',
+              borderRadius: activeSection === s.id ? '0' : '0',
+              transition: 'all 0.15s',
             }}
           >
-            <span>{s.icon}</span>
+            <span style={{ fontSize: '1.1rem' }}>{s.icon}</span>
             <span>{s.label}</span>
           </button>
         ))}
@@ -56,11 +57,10 @@ export default function TeacherGuide() {
       <main style={{
         flex: 1,
         overflowY: 'auto',
-        padding: '32px 40px',
-        maxWidth: '860px',
+        padding: '36px 48px',
+        maxWidth: '900px',
       }}>
         {activeSection === 'overview' && <OverviewSection />}
-        {activeSection === 'curriculum' && <CurriculumSection />}
         {activeSection === 'howto' && <HowtoSection />}
         {activeSection === 'challenges' && <ChallengesSection />}
         {activeSection === 'tips' && <TipsSection />}
@@ -75,94 +75,81 @@ export default function TeacherGuide() {
 function OverviewSection() {
   return (
     <div>
-      <SectionTitle>서비스 소개</SectionTitle>
-      <Paragraph>
-        <strong>"말로 만드는 세계"</strong>는 고등학교 1학년 정보 교과를 위한 VPython 프롬프트 챌린지 웹앱입니다.
-        학생들이 코드를 직접 작성하지 않고, <Highlight>자연어 프롬프트</Highlight>로 AI에게 3D 장면을 만들도록 지시합니다.
-      </Paragraph>
-
-      <Card title="핵심 교육 철학" accent>
-        <ul style={{ ...listStyle }}>
-          <li><strong>Reverse Engineering Pedagogy</strong> — 결과물을 보고 역으로 문제를 정의하는 방식</li>
-          <li><strong>컴퓨팅 사고력(CT)</strong>을 자연어 활동으로 체득 — 분해, 패턴인식, 추상화, 알고리즘</li>
-          <li><strong>AI 시대의 문제 정의 능력</strong> — 코딩 실력이 아니라 "무엇을 만들지 정확히 말하기"</li>
-        </ul>
-      </Card>
-
-      <SubTitle>수업 구성 개요</SubTitle>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '24px' }}>
-        <StatCard label="대상" value="고1 정보" />
-        <StatCard label="팀 구성" value="2인 1팀" />
-        <StatCard label="최대 팀 수" value="15팀" />
+      {/* 히어로 배너 */}
+      <div style={{
+        background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a78bfa 100%)',
+        borderRadius: '16px',
+        padding: '36px 32px',
+        marginBottom: '28px',
+        color: 'white',
+      }}>
+        <div style={{ fontSize: '2rem', marginBottom: '8px' }}>🌍</div>
+        <h1 style={{ fontSize: '1.75rem', fontWeight: 800, marginBottom: '8px' }}>말로 만드는 세계</h1>
+        <p style={{ fontSize: '1rem', opacity: 0.9, lineHeight: 1.6 }}>
+          코드 없이 자연어 프롬프트로 3D 장면을 만드는 VPython 챌린지
+        </p>
+        <p style={{ fontSize: '0.875rem', opacity: 0.7, marginTop: '6px' }}>
+          고등학교 1학년 정보 교과 · 2인 1팀 · 팀 대항전
+        </p>
       </div>
 
-      <SubTitle>기술 구성</SubTitle>
+      {/* 핵심 포인트 3개 */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '14px', marginBottom: '28px' }}>
+        <PointCard emoji="🔄" color="#f59e0b" title="Reverse Engineering"
+          desc="결과물을 보고 역으로 문제를 정의하는 교육 설계" />
+        <PointCard emoji="🧩" color="#22c55e" title="컴퓨팅 사고력"
+          desc="분해, 패턴인식, 추상화를 자연어 활동으로 체득" />
+        <PointCard emoji="🎯" color="#6366f1" title="문제 정의 능력"
+          desc="AI 시대에 가장 중요한 '정확히 말하기' 훈련" />
+      </div>
+
+      {/* 수업 구성 */}
+      <SectionTitle>수업 구성</SectionTitle>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '12px', marginBottom: '28px' }}>
+        <StatCard emoji="👥" label="대상" value="고1 정보" />
+        <StatCard emoji="🤝" label="팀 구성" value="2인 1팀" />
+        <StatCard emoji="📱" label="최대 팀 수" value="15팀" />
+        <StatCard emoji="⏱️" label="수업 시간" value="100분" />
+      </div>
+
+      {/* 기술 구성 */}
+      <SectionTitle>작동 원리</SectionTitle>
       <Card>
-        <table style={tableStyle}>
-          <tbody>
-            <tr><td style={tdLabelStyle}>3D 렌더링</td><td style={tdStyle}>GlowScript (VPython 웹 버전)</td></tr>
-            <tr><td style={tdLabelStyle}>AI 코드 생성</td><td style={tdStyle}>Claude Haiku — 빠른 응답</td></tr>
-            <tr><td style={tdLabelStyle}>AI 평가</td><td style={tdStyle}>Claude Sonnet — 정밀 채점</td></tr>
-            <tr><td style={tdLabelStyle}>실시간 통신</td><td style={tdStyle}>Socket.io — 챌린지 전송, 힌트, 채팅</td></tr>
-          </tbody>
-        </table>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+          <TechItem icon="🎨" label="3D 렌더링" value="GlowScript (VPython 웹 버전)" />
+          <TechItem icon="🤖" label="AI 코드 생성" value="Claude Haiku 4.5" />
+          <TechItem icon="📊" label="AI 평가" value="Claude Sonnet 4.6" />
+          <TechItem icon="📡" label="실시간 통신" value="Socket.io" />
+        </div>
       </Card>
-    </div>
-  )
-}
 
-function CurriculumSection() {
-  return (
-    <div>
-      <SectionTitle>커리큘럼 아크 (5세션)</SectionTitle>
-      <Paragraph>
-        5세션에 걸쳐 컴퓨팅 사고력의 핵심 요소를 순차적으로 학습합니다.
-        Session 1과 5에서 동일한 챌린지를 풀어 성장을 측정합니다.
-      </Paragraph>
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-        <SessionCard
-          num={1}
-          title="문제 정의"
-          status="구현 완료"
-          ct="분해 · 패턴인식 · 추상화"
-          desc="자연어 프롬프트로 3D 장면 만들기. '정확하게 말하기'의 중요성을 체험합니다."
-          detail="종이 게임(아날로그) → 프롬프트 배틀(디지털) → 회고"
-          time="100분"
-        />
-        <SessionCard
-          num={2}
-          title="코드 해독"
-          status="기획 중"
-          ct="패턴인식"
-          desc="Session 1에서 AI가 생성한 코드를 역분석하여 프로그래밍 구조를 발견합니다."
-          time="50분"
-        />
-        <SessionCard
-          num={3}
-          title="직접 코딩"
-          status="기획 중"
-          ct="알고리즘"
-          desc="VPython 코드를 직접 수정하며 프로그래밍 기본 문법을 학습합니다."
-          time="50분"
-        />
-        <SessionCard
-          num={4}
-          title="창작 프로젝트"
-          status="기획 중"
-          ct="전체 통합"
-          desc="팀별 자유 주제로 3D 장면을 설계하고 구현합니다."
-          time="100분"
-        />
-        <SessionCard
-          num={5}
-          title="성장 측정"
-          status="기획 중"
-          ct="분해 · 패턴인식 · 추상화"
-          desc="Session 1과 동일 챌린지를 다시 풀어 프롬프트 품질 성장을 비교합니다."
-          time="50분"
-        />
-      </div>
+      {/* 수업 흐름 다이어그램 */}
+      <SectionTitle>수업 흐름</SectionTitle>
+      <Card>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
+          {[
+            { emoji: '📝', label: '학생이\n프롬프트 작성' },
+            { emoji: '🤖', label: 'AI가\n코드 생성' },
+            { emoji: '🎨', label: '3D 장면\n렌더링' },
+            { emoji: '📊', label: 'AI가\n점수 평가' },
+            { emoji: '🔄', label: '피드백 후\n재도전' },
+          ].map((step, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {i > 0 && <span style={{ fontSize: '1.25rem', color: '#cbd5e1' }}>→</span>}
+              <div style={{
+                textAlign: 'center',
+                padding: '14px 16px',
+                background: '#f8fafc',
+                borderRadius: '12px',
+                minWidth: '100px',
+              }}>
+                <div style={{ fontSize: '1.75rem', marginBottom: '6px' }}>{step.emoji}</div>
+                <div style={{ fontSize: '0.75rem', color: '#475569', fontWeight: 500, whiteSpace: 'pre-line', lineHeight: 1.4 }}>{step.label}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
     </div>
   )
 }
@@ -172,18 +159,16 @@ function HowtoSection() {
     <div>
       <SectionTitle>수업 진행 방법</SectionTitle>
 
-      <SubTitle>1단계: 세션 생성</SubTitle>
-      <Card>
+      <StepCard num={1} color="#6366f1" title="세션 생성">
         <ol style={listStyle}>
           <li><code style={codeStyle}>/teacher</code> 경로로 접속합니다.</li>
           <li>Anthropic API 키를 입력합니다. (수업 중 AI 기능에 필요)</li>
           <li>교사 코드(간단한 암호)를 설정합니다.</li>
           <li>"세션 시작" 버튼을 누르면 수업 세션이 생성됩니다.</li>
         </ol>
-      </Card>
+      </StepCard>
 
-      <SubTitle>2단계: 학생 접속</SubTitle>
-      <Card>
+      <StepCard num={2} color="#8b5cf6" title="학생 접속">
         <ol style={listStyle}>
           <li>"접속 안내" 탭에 표시된 URL을 칠판에 적거나 공유합니다.</li>
           <li>학생들은 해당 URL에 접속한 후 교사 코드를 입력합니다.</li>
@@ -194,10 +179,9 @@ function HowtoSection() {
           15팀을 초과하면 관람 모드로 자동 전환됩니다.
           기기가 부족한 경우 한 팀이 1대의 기기로 진행할 수 있습니다.
         </InfoBox>
-      </Card>
+      </StepCard>
 
-      <SubTitle>3단계: 챌린지 진행</SubTitle>
-      <Card>
+      <StepCard num={3} color="#a78bfa" title="챌린지 진행">
         <ol style={listStyle}>
           <li>"수업 진행" 탭으로 이동합니다.</li>
           <li>왼쪽 사이드바에서 챌린지를 선택하고 "시작" 버튼을 누릅니다.</li>
@@ -206,126 +190,93 @@ function HowtoSection() {
           <li>AI가 목표 장면과 비교하여 점수를 매깁니다. (100점 만점)</li>
           <li>학생은 여러 번 재시도할 수 있습니다.</li>
         </ol>
-      </Card>
+      </StepCard>
 
-      <SubTitle>4단계: 비교 및 회고</SubTitle>
-      <Card>
+      <StepCard num={4} color="#c084fc" title="비교 및 회고">
         <ol style={listStyle}>
           <li>대시보드에서 팀 카드를 클릭하면 해당 팀의 프롬프트를 볼 수 있습니다.</li>
           <li>두 팀의 카드를 선택하면 프롬프트를 나란히 비교할 수 있습니다.</li>
           <li>"결과 공개" 버튼으로 전체 순위를 공개합니다.</li>
           <li>팀 채팅 모니터링으로 학생들의 대화를 실시간 확인합니다.</li>
         </ol>
-      </Card>
+      </StepCard>
 
-      <SubTitle>교사 대시보드 기능 요약</SubTitle>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-        <FeatureCard icon="🎮" title="데모 모드" desc="교사가 직접 프롬프트를 입력하여 시연 (실패 쇼에 활용)" />
-        <FeatureCard icon="💬" title="채팅 모니터링" desc="모든 팀의 채팅을 실시간으로 확인" />
-        <FeatureCard icon="🔍" title="프롬프트 비교" desc="두 팀의 프롬프트를 나란히 비교" />
-        <FeatureCard icon="📊" title="CSV 내보내기" desc="팀별 점수와 프롬프트를 CSV로 다운로드" />
-        <FeatureCard icon="💡" title="힌트 전송" desc="막히는 팀에게 실시간으로 힌트 전송" />
-        <FeatureCard icon="🏆" title="결과 공개" desc="라운드 종료 후 전체 순위를 일괄 공개" />
+      <SectionTitle>교사 대시보드 기능</SectionTitle>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+        <FeatureCard icon="🎮" color="#f59e0b" title="데모 모드" desc="교사가 직접 프롬프트를 입력하여 시연" />
+        <FeatureCard icon="💬" color="#22c55e" title="채팅 모니터링" desc="모든 팀의 채팅을 실시간으로 확인" />
+        <FeatureCard icon="🔍" color="#3b82f6" title="프롬프트 비교" desc="두 팀의 프롬프트를 나란히 비교" />
+        <FeatureCard icon="📊" color="#8b5cf6" title="CSV 내보내기" desc="팀별 점수와 프롬프트를 다운로드" />
+        <FeatureCard icon="💡" color="#f97316" title="힌트 전송" desc="막히는 팀에게 실시간으로 힌트 전송" />
+        <FeatureCard icon="🏆" color="#ef4444" title="결과 공개" desc="라운드 종료 후 전체 순위 일괄 공개" />
       </div>
     </div>
   )
 }
 
 function ChallengesSection() {
-  const challenges = [
-    { emoji: '🔴', title: '빨간 구', level: 1, ct: '추상화', desc: '단일 객체의 속성(종류, 색상, 위치)을 정확히 묘사' },
-    { emoji: '📦', title: '파란 상자', level: 1, ct: '추상화', desc: '정육면체의 크기와 위치를 묘사' },
-    { emoji: '🌿', title: '초록 원기둥', level: 1, ct: '추상화', desc: '원기둥의 방향(축)과 굵기를 묘사' },
-    { emoji: '🚦', title: '이상한 신호등', level: 2, ct: '분해', desc: '여러 부품의 순서와 색상을 정확히 분해하여 설명' },
-    { emoji: '⛄', title: '눈사람', level: 2, ct: '분해', desc: '두 구의 크기 비율과 상대적 위치 관계' },
-    { emoji: '🏠', title: '집', level: 2, ct: '분해', desc: '벽과 지붕이라는 서로 다른 도형의 조합' },
-    { emoji: '🌍', title: '지구와 달', level: 2, ct: '추상화', desc: '두 구의 크기 비율과 거리 관계' },
-    { emoji: '🌸', title: '꽃', level: 2, ct: '패턴인식', desc: '꽃잎 6개의 원형 배치 — 60도 간격 패턴' },
-    { emoji: '🌲', title: '숲', level: 3, ct: '추상화·알고리즘', desc: '나무를 먼저 정의(추상화)한 뒤 반복 배치' },
-    { emoji: '🌈', title: '무지개 줄', level: 3, ct: '패턴인식·알고리즘', desc: '7개 구의 색상 순서와 등간격 배치' },
-    { emoji: '🎯', title: '과녁', level: 3, ct: '패턴인식', desc: '동심원 4개의 크기 감소 패턴과 색상 순서' },
-    { emoji: '🧱', title: '벽돌 벽', level: 3, ct: '알고리즘·분해', desc: '5×3 격자 — 이중 반복 패턴' },
-  ]
+  const levelMeta = {
+    1: { label: 'Level 1 — 정밀 묘사', color: '#22c55e', bg: '#f0fdf4', desc: '도형 하나의 형태, 방향, 비율을 정밀하게 묘사' },
+    2: { label: 'Level 2 — 분해와 재조합', color: '#f59e0b', bg: '#fffbeb', desc: '현실 사물을 기본 도형으로 해체하기' },
+    3: { label: 'Level 3 — 반복 패턴', color: '#ef4444', bg: '#fef2f2', desc: '하나를 설명하고, 규칙을 말하라' },
+  }
 
   return (
     <div>
       <SectionTitle>챌린지 구성</SectionTitle>
-      <Paragraph>
-        총 12개의 챌린지가 난이도별로 구성되어 있습니다.
-        Session 1 수업에서는 <Highlight>이상한 신호등 → 꽃 → 숲</Highlight> 순서로 진행하는 것을 권장합니다.
-      </Paragraph>
+      <p style={{ fontSize: '0.9375rem', lineHeight: 1.7, color: '#475569', marginBottom: '24px' }}>
+        총 <strong>{BATTLE_CHALLENGES.length}개</strong>의 챌린지가 난이도별로 구성되어 있습니다.
+        교사가 사이드바에서 원하는 챌린지를 골라 수업 중 실시간으로 전송합니다.
+      </p>
 
-      {[1, 2, 3].map(level => (
-        <div key={level} style={{ marginBottom: '24px' }}>
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px',
-          }}>
-            <span style={{
-              padding: '2px 10px',
-              borderRadius: '20px',
-              fontSize: '0.75rem',
-              fontWeight: 700,
-              background: level === 1 ? '#22c55e22' : level === 2 ? '#f59e0b22' : '#ef444422',
-              color: level === 1 ? 'var(--success)' : level === 2 ? 'var(--warning)' : 'var(--danger)',
-              border: `1px solid ${level === 1 ? 'var(--success)' : level === 2 ? 'var(--warning)' : 'var(--danger)'}`,
+      {[1, 2, 3].map(level => {
+        const meta = levelMeta[level]
+        const challenges = BATTLE_CHALLENGES.filter(c => c.level === level)
+        return (
+          <div key={level} style={{ marginBottom: '24px' }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px',
+              padding: '10px 16px',
+              background: meta.bg,
+              borderRadius: '10px',
+              border: `1px solid ${meta.color}33`,
             }}>
-              Level {level}
-            </span>
-            <span style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
-              {level === 1 ? '단일 객체' : level === 2 ? '2~3개 조합' : '반복 패턴'}
-            </span>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {challenges.filter(c => c.level === level).map(c => (
-              <div key={c.title} style={{
-                display: 'grid',
-                gridTemplateColumns: '140px 100px 1fr',
-                gap: '12px',
-                alignItems: 'center',
-                padding: '12px 16px',
-                background: 'var(--surface)',
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius)',
+              <span style={{
+                padding: '3px 12px', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 700,
+                background: meta.color, color: 'white',
               }}>
-                <span style={{ fontWeight: 600, fontSize: '0.875rem' }}>{c.emoji} {c.title}</span>
-                <span style={{
-                  fontSize: '0.75rem',
-                  color: 'var(--accent-hover)',
-                  background: 'var(--bg)',
-                  padding: '2px 8px',
-                  borderRadius: '4px',
-                  textAlign: 'center',
-                }}>{c.ct}</span>
-                <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>{c.desc}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      ))}
-
-      <Card title="Session 1 권장 순서" accent>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-          {[
-            { emoji: '🚦', name: '이상한 신호등', ct: '분해', time: '17분' },
-            { emoji: '🌸', name: '꽃', ct: '패턴인식', time: '16분' },
-            { emoji: '🌲', name: '숲', ct: '추상화', time: '14분' },
-          ].map((c, i) => (
-            <div key={c.name} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              {i > 0 && <span style={{ color: 'var(--text-muted)', fontSize: '1.25rem' }}>→</span>}
-              <div style={{
-                padding: '8px 14px',
-                background: 'var(--bg)',
-                borderRadius: 'var(--radius)',
-                textAlign: 'center',
-              }}>
-                <div style={{ fontSize: '1.5rem' }}>{c.emoji}</div>
-                <div style={{ fontWeight: 600, fontSize: '0.8125rem' }}>{c.name}</div>
-                <div style={{ fontSize: '0.6875rem', color: 'var(--accent-hover)' }}>{c.ct} · {c.time}</div>
-              </div>
+                Lv.{level}
+              </span>
+              <span style={{ fontSize: '0.875rem', fontWeight: 600, color: meta.color }}>{meta.label.split(' — ')[1]}</span>
+              <span style={{ fontSize: '0.8125rem', color: '#94a3b8', marginLeft: '4px' }}>— {meta.desc}</span>
             </div>
-          ))}
-        </div>
-      </Card>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              {challenges.map(c => (
+                <div key={c.id} style={{
+                  display: 'flex', alignItems: 'center', gap: '12px',
+                  padding: '14px 16px',
+                  background: 'white',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '10px',
+                  transition: 'box-shadow 0.15s',
+                }}>
+                  <span style={{ fontSize: '1.5rem' }}>{c.emoji}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: '0.875rem', color: '#1e293b' }}>{c.title}</div>
+                    <div style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.description}</div>
+                  </div>
+                  <div style={{
+                    fontSize: '0.6875rem', color: meta.color, background: meta.bg,
+                    padding: '2px 8px', borderRadius: '6px', fontWeight: 600, whiteSpace: 'nowrap',
+                  }}>
+                    {c.ct.join(' · ')}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -336,78 +287,44 @@ function TipsSection() {
       <SectionTitle>운영 팁</SectionTitle>
 
       <SubTitle>순회 우선순위</SubTitle>
-      <Card>
-        <table style={tableStyle}>
-          <thead>
-            <tr>
-              <th style={thStyle}>챌린지</th>
-              <th style={thStyle}>먼저 방문할 팀</th>
-              <th style={thStyle}>이유</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr><td style={tdStyle}>신호등</td><td style={tdStyle}>"신호등 만들어줘" 단순 제출</td><td style={tdStyle}>분해 개념 유도 필요</td></tr>
-            <tr><td style={tdStyle}>꽃</td><td style={tdStyle}>자연어로만 위치 표현</td><td style={tdStyle}>패턴/각도 개념 유도</td></tr>
-            <tr><td style={tdStyle}>숲</td><td style={tdStyle}>나무를 각각 따로 설명</td><td style={tdStyle}>추상화 유도 필요</td></tr>
-          </tbody>
-        </table>
-      </Card>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '28px' }}>
+        <PriorityCard emoji="🌀" level="Level 1 — 정밀 묘사" team='"포탈 만들어줘" 단순 제출 팀' why="도형의 방향·비율 묘사 유도" color="#22c55e" />
+        <PriorityCard emoji="🍄" level="Level 2 — 분해" team="부품 구분 없이 통째로 설명하는 팀" why="줄기/갓 등 부품별 분해 유도" color="#f59e0b" />
+        <PriorityCard emoji="🪜" level="Level 3 — 패턴" team="계단을 하나씩 따로 설명하는 팀" why="반복 규칙으로 압축 유도" color="#ef4444" />
+      </div>
 
-      <SubTitle>즉각 피드백 원칙</SubTitle>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        <TipCard icon="📉" title="낮은 점수" feedback="'뭐가 부족했을 것 같아요?' — 원인을 스스로 분석하게 합니다." />
-        <TipCard icon="✨" title="좋은 프롬프트 발견" feedback="전체에 공유하고 '어떻게 이렇게 썼어요?'라고 질문합니다." />
-        <TipCard icon="🤖" title="AI 결과가 이상할 때" feedback="'AI가 왜 이렇게 만들었을까요?' — AI 탓이 아니라 프롬프트 분석으로 유도합니다." />
-        <TipCard icon="😶" title="막히는 팀" feedback="힌트 버튼을 활성화하고 조용히 방문하여 1:1 질문합니다." />
-        <TipCard icon="⏸️" title="제출 전 개입 금지" feedback="먼저 제출하게 한 후 피드백합니다. 실패 경험이 학습입니다." />
+      <SubTitle>피드백 원칙</SubTitle>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '28px' }}>
+        <TipCard emoji="📉" title="낮은 점수" feedback="'뭐가 부족했을 것 같아요?' — 원인을 스스로 분석하게 합니다." bg="#fef2f2" />
+        <TipCard emoji="✨" title="좋은 프롬프트" feedback="전체에 공유하고 '어떻게 이렇게 썼어요?'라고 질문합니다." bg="#f0fdf4" />
+        <TipCard emoji="🤖" title="AI 결과 이상" feedback="'AI가 왜 이렇게 만들었을까요?' — 프롬프트 분석으로 유도합니다." bg="#eff6ff" />
+        <TipCard emoji="⏸️" title="제출 전 개입 금지" feedback="먼저 제출하게 한 후 피드백합니다. 실패 경험이 학습입니다." bg="#fffbeb" />
       </div>
 
       <SubTitle>학생 유형별 대응</SubTitle>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '24px' }}>
-        <Card>
-          <div style={{ fontWeight: 600, fontSize: '0.875rem', marginBottom: '6px' }}>
-            "AI가 다 해주면 되지 않나요?"
-          </div>
-          <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
-            → "맞아요. 근데 AI한테 '더 좋게 해줘'라고 하면 AI가 알까요?
-            뭘 어떻게 더 좋게 해야 하는지 정확히 말해야 해요."
-          </div>
-        </Card>
-        <Card>
-          <div style={{ fontWeight: 600, fontSize: '0.875rem', marginBottom: '6px' }}>
-            "어차피 ChatGPT 쓰면 다 나오는데"
-          </div>
-          <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
-            → "챌린지 1번에서 '신호등 만들어줘' 했을 때 기억나요?
-            AI가 신호등을 알면서도 우리가 원하는 신호등을 못 만들었잖아요."
-          </div>
-        </Card>
-        <Card>
-          <div style={{ fontWeight: 600, fontSize: '0.875rem', marginBottom: '6px' }}>
-            말이 없는 팀
-          </div>
-          <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
-            → 팀원 한 명을 지정해서 1:1 질문: "○○아, 이 프롬프트에서 빠진 게 뭔 것 같아?"
-          </div>
-        </Card>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '28px' }}>
+        <ResponseCard
+          question='"AI가 다 해주면 되지 않나요?"'
+          answer="맞아요. 근데 AI한테 '더 좋게 해줘'라고 하면 AI가 알까요? 뭘 어떻게 더 좋게 해야 하는지 정확히 말해야 해요."
+        />
+        <ResponseCard
+          question='"어차피 ChatGPT 쓰면 다 나오는데"'
+          answer="'버섯 만들어줘'라고 해보세요. AI가 버섯을 알면서도 내가 원하는 버섯을 못 만들어요."
+        />
+        <ResponseCard
+          question="말이 없는 팀"
+          answer='팀원 한 명을 지정해서 1:1 질문: "○○아, 이 프롬프트에서 빠진 게 뭔 것 같아?"'
+        />
       </div>
 
-      <SubTitle>WiFi/기기 트러블슈팅</SubTitle>
+      <SubTitle>트러블슈팅</SubTitle>
       <Card>
-        <table style={tableStyle}>
-          <thead>
-            <tr>
-              <th style={thStyle}>상황</th>
-              <th style={thStyle}>대응</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr><td style={tdStyle}>학교 WiFi 차단</td><td style={tdStyle}>교사 핫스팟으로 전환</td></tr>
-            <tr><td style={tdStyle}>QR 스캔 불가</td><td style={tdStyle}>칠판에 IP 직접 기재</td></tr>
-            <tr><td style={tdStyle}>학생 기기 없음</td><td style={tdStyle}>팀 1대로 통합 진행</td></tr>
-            <tr><td style={tdStyle}>15팀 초과</td><td style={tdStyle}>자동으로 관람 모드 전환</td></tr>
-          </tbody>
-        </table>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+          <TroubleshootItem icon="📶" problem="학교 WiFi 차단" solution="교사 핫스팟으로 전환" />
+          <TroubleshootItem icon="📱" problem="QR 스캔 불가" solution="칠판에 IP 직접 기재" />
+          <TroubleshootItem icon="🔋" problem="학생 기기 없음" solution="팀 1대로 통합 진행" />
+          <TroubleshootItem icon="👥" problem="15팀 초과" solution="자동으로 관람 모드 전환" />
+        </div>
       </Card>
     </div>
   )
@@ -421,7 +338,7 @@ function FAQSection() {
     },
     {
       q: 'API 비용은 얼마나 드나요?',
-      a: '1회 수업(15팀 × 평균 10회 제출) 기준 약 $1~2 정도입니다. Haiku(코드 생성)는 매우 저렴하고, Sonnet(평가)이 비용의 대부분을 차지합니다.',
+      a: '1회 수업(15팀 × 평균 10회 제출) 기준 약 $1~2 정도입니다. Haiku 4.5(코드 생성)는 매우 저렴하고, Sonnet 4.6(평가)이 비용의 대부분을 차지합니다.',
     },
     {
       q: '인터넷 없이 사용할 수 있나요?',
@@ -437,22 +354,18 @@ function FAQSection() {
     },
     {
       q: '수업 데이터는 어디에 저장되나요?',
-      a: '교사 노트북의 SQLite 데이터베이스에 로컬 저장됩니다. 팀별 프롬프트, 점수, 시도 횟수가 모두 기록되며 CSV로 내보낼 수 있습니다.',
+      a: '서버의 SQLite 데이터베이스에 저장됩니다. 팀별 프롬프트, 점수, 시도 횟수가 모두 기록되며 CSV로 내보낼 수 있습니다.',
     },
     {
       q: '한 세션에서 여러 챌린지를 진행할 수 있나요?',
       a: '네. 사이드바에서 다른 챌린지를 선택하고 "시작" 버튼을 누르면 모든 팀에 새 챌린지가 전송됩니다.',
     },
-    {
-      q: 'Session 2~5도 사용할 수 있나요?',
-      a: '현재 Session 1(프롬프트 배틀)이 구현되어 있습니다. Session 2~5는 기획 단계이며, 향후 업데이트될 예정입니다.',
-    },
   ]
 
   return (
     <div>
-      <SectionTitle>자주 묻는 질문 (FAQ)</SectionTitle>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+      <SectionTitle>자주 묻는 질문</SectionTitle>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
         {faqs.map((f, i) => (
           <FAQItem key={i} q={f.q} a={f.a} />
         ))}
@@ -465,34 +378,25 @@ function FAQSection() {
 
 function SectionTitle({ children }) {
   return (
-    <h1 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '16px', paddingBottom: '12px', borderBottom: '1px solid var(--border)' }}>
+    <h2 style={{ fontSize: '1.25rem', fontWeight: 700, color: '#1e293b', marginBottom: '16px', marginTop: '4px' }}>
       {children}
-    </h1>
+    </h2>
   )
 }
 
 function SubTitle({ children }) {
-  return <h2 style={{ fontSize: '1.125rem', fontWeight: 700, marginBottom: '12px', marginTop: '28px' }}>{children}</h2>
+  return <h3 style={{ fontSize: '1.0625rem', fontWeight: 700, color: '#334155', marginBottom: '12px', marginTop: '8px' }}>{children}</h3>
 }
 
-function Paragraph({ children }) {
-  return <p style={{ fontSize: '0.9375rem', lineHeight: 1.7, color: 'var(--text)', marginBottom: '20px' }}>{children}</p>
-}
-
-function Highlight({ children }) {
-  return <span style={{ color: 'var(--accent-hover)', fontWeight: 600 }}>{children}</span>
-}
-
-function Card({ children, title, accent }) {
+function Card({ children }) {
   return (
     <div style={{
-      background: 'var(--surface)',
-      border: `1px solid ${accent ? 'var(--accent)' : 'var(--border)'}`,
-      borderRadius: 'var(--radius-lg)',
+      background: 'white',
+      border: '1px solid #e2e8f0',
+      borderRadius: '14px',
       padding: '20px',
       marginBottom: '16px',
     }}>
-      {title && <div style={{ fontWeight: 700, fontSize: '0.9375rem', marginBottom: '12px' }}>{title}</div>}
       {children}
     </div>
   )
@@ -503,106 +407,159 @@ function InfoBox({ children }) {
     <div style={{
       marginTop: '12px',
       padding: '10px 14px',
-      background: 'var(--bg)',
-      borderLeft: '3px solid var(--warning)',
-      borderRadius: '0 var(--radius) var(--radius) 0',
+      background: '#fffbeb',
+      borderLeft: '3px solid #f59e0b',
+      borderRadius: '0 8px 8px 0',
       fontSize: '0.8125rem',
-      color: 'var(--text-muted)',
+      color: '#92400e',
     }}>
       {children}
     </div>
   )
 }
 
-function StatCard({ label, value }) {
+function PointCard({ emoji, color, title, desc }) {
   return (
     <div style={{
-      background: 'var(--surface)',
-      border: '1px solid var(--border)',
-      borderRadius: 'var(--radius)',
+      background: 'white',
+      border: '1px solid #e2e8f0',
+      borderRadius: '14px',
+      padding: '20px',
+      textAlign: 'center',
+      borderTop: `3px solid ${color}`,
+    }}>
+      <div style={{ fontSize: '2rem', marginBottom: '8px' }}>{emoji}</div>
+      <div style={{ fontWeight: 700, fontSize: '0.9375rem', color: '#1e293b', marginBottom: '6px' }}>{title}</div>
+      <div style={{ fontSize: '0.8125rem', color: '#64748b', lineHeight: 1.5 }}>{desc}</div>
+    </div>
+  )
+}
+
+function StatCard({ emoji, label, value }) {
+  return (
+    <div style={{
+      background: 'white',
+      border: '1px solid #e2e8f0',
+      borderRadius: '12px',
       padding: '16px',
       textAlign: 'center',
     }}>
-      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>{label}</div>
-      <div style={{ fontSize: '1.25rem', fontWeight: 700 }}>{value}</div>
+      <div style={{ fontSize: '1.5rem', marginBottom: '4px' }}>{emoji}</div>
+      <div style={{ fontSize: '0.6875rem', color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</div>
+      <div style={{ fontSize: '1.125rem', fontWeight: 700, color: '#1e293b', marginTop: '2px' }}>{value}</div>
     </div>
   )
 }
 
-function SessionCard({ num, title, status, ct, desc, detail, time }) {
-  const isReady = status === '구현 완료'
+function TechItem({ icon, label, value }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: '#f8fafc', borderRadius: '10px' }}>
+      <span style={{ fontSize: '1.25rem' }}>{icon}</span>
+      <div>
+        <div style={{ fontSize: '0.6875rem', color: '#94a3b8', fontWeight: 600 }}>{label}</div>
+        <div style={{ fontSize: '0.875rem', color: '#334155', fontWeight: 500 }}>{value}</div>
+      </div>
+    </div>
+  )
+}
+
+function StepCard({ num, color, title, children }) {
   return (
     <div style={{
-      display: 'flex',
-      gap: '16px',
-      padding: '16px 20px',
-      background: 'var(--surface)',
-      border: `1px solid ${isReady ? 'var(--success)' : 'var(--border)'}`,
-      borderRadius: 'var(--radius-lg)',
+      background: 'white',
+      border: '1px solid #e2e8f0',
+      borderRadius: '14px',
+      padding: '20px 24px',
+      marginBottom: '14px',
+      borderLeft: `4px solid ${color}`,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
+        <div style={{
+          width: '32px', height: '32px', borderRadius: '50%',
+          background: color, color: 'white',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontWeight: 700, fontSize: '0.875rem', flexShrink: 0,
+        }}>
+          {num}
+        </div>
+        <h3 style={{ fontSize: '1.0625rem', fontWeight: 700, color: '#1e293b' }}>{title}</h3>
+      </div>
+      {children}
+    </div>
+  )
+}
+
+function FeatureCard({ icon, color, title, desc }) {
+  return (
+    <div style={{
+      padding: '18px',
+      background: 'white',
+      border: '1px solid #e2e8f0',
+      borderRadius: '12px',
+      textAlign: 'center',
     }}>
       <div style={{
-        width: '44px', height: '44px',
-        borderRadius: '50%',
-        background: isReady ? '#22c55e22' : 'var(--bg)',
-        border: `2px solid ${isReady ? 'var(--success)' : 'var(--border)'}`,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontWeight: 700, fontSize: '1.125rem', flexShrink: 0,
-        color: isReady ? 'var(--success)' : 'var(--text-muted)',
-      }}>
-        {num}
-      </div>
-      <div style={{ flex: 1 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-          <span style={{ fontWeight: 700, fontSize: '1rem' }}>{title}</span>
-          <span style={{
-            padding: '1px 8px',
-            borderRadius: '20px',
-            fontSize: '0.6875rem',
-            fontWeight: 600,
-            background: isReady ? '#22c55e22' : 'var(--bg)',
-            color: isReady ? 'var(--success)' : 'var(--text-muted)',
-            border: `1px solid ${isReady ? 'var(--success)' : 'var(--border)'}`,
-          }}>
-            {status}
-          </span>
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: 'auto' }}>{time}</span>
-        </div>
-        <div style={{ fontSize: '0.8125rem', color: 'var(--accent-hover)', marginBottom: '4px' }}>{ct}</div>
-        <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>{desc}</div>
-        {detail && <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '6px', fontStyle: 'italic' }}>{detail}</div>}
-      </div>
+        width: '44px', height: '44px', borderRadius: '12px',
+        background: `${color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        margin: '0 auto 10px', fontSize: '1.25rem',
+      }}>{icon}</div>
+      <div style={{ fontWeight: 600, fontSize: '0.875rem', color: '#1e293b', marginBottom: '4px' }}>{title}</div>
+      <div style={{ fontSize: '0.8125rem', color: '#64748b' }}>{desc}</div>
     </div>
   )
 }
 
-function FeatureCard({ icon, title, desc }) {
+function PriorityCard({ emoji, level, team, why, color }) {
   return (
     <div style={{
-      padding: '16px',
-      background: 'var(--surface)',
-      border: '1px solid var(--border)',
-      borderRadius: 'var(--radius)',
+      background: 'white', border: '1px solid #e2e8f0', borderRadius: '12px',
+      padding: '16px', borderTop: `3px solid ${color}`,
     }}>
-      <div style={{ fontSize: '1.5rem', marginBottom: '6px' }}>{icon}</div>
-      <div style={{ fontWeight: 600, fontSize: '0.875rem', marginBottom: '4px' }}>{title}</div>
-      <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>{desc}</div>
+      <div style={{ fontSize: '1.5rem', marginBottom: '8px' }}>{emoji}</div>
+      <div style={{ fontSize: '0.75rem', color, fontWeight: 700, marginBottom: '4px' }}>{level}</div>
+      <div style={{ fontSize: '0.8125rem', color: '#334155', fontWeight: 600, marginBottom: '4px' }}>{team}</div>
+      <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{why}</div>
     </div>
   )
 }
 
-function TipCard({ icon, title, feedback }) {
+function TipCard({ emoji, title, feedback, bg }) {
   return (
     <div style={{
       display: 'flex', gap: '12px', alignItems: 'flex-start',
       padding: '14px 16px',
-      background: 'var(--surface)',
-      border: '1px solid var(--border)',
-      borderRadius: 'var(--radius)',
+      background: bg || 'white',
+      border: '1px solid #e2e8f0',
+      borderRadius: '12px',
     }}>
-      <span style={{ fontSize: '1.25rem', flexShrink: 0 }}>{icon}</span>
+      <span style={{ fontSize: '1.25rem', flexShrink: 0 }}>{emoji}</span>
       <div>
-        <div style={{ fontWeight: 600, fontSize: '0.875rem', marginBottom: '4px' }}>{title}</div>
-        <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>{feedback}</div>
+        <div style={{ fontWeight: 600, fontSize: '0.875rem', color: '#1e293b', marginBottom: '4px' }}>{title}</div>
+        <div style={{ fontSize: '0.8125rem', color: '#64748b', lineHeight: 1.5 }}>{feedback}</div>
+      </div>
+    </div>
+  )
+}
+
+function ResponseCard({ question, answer }) {
+  return (
+    <div style={{
+      background: 'white', border: '1px solid #e2e8f0', borderRadius: '12px',
+      padding: '16px 20px',
+    }}>
+      <div style={{ fontWeight: 600, fontSize: '0.875rem', color: '#6366f1', marginBottom: '6px' }}>{question}</div>
+      <div style={{ fontSize: '0.8125rem', color: '#475569', lineHeight: 1.6 }}>→ {answer}</div>
+    </div>
+  )
+}
+
+function TroubleshootItem({ icon, problem, solution }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', background: '#f8fafc', borderRadius: '10px' }}>
+      <span style={{ fontSize: '1.25rem' }}>{icon}</span>
+      <div>
+        <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#ef4444' }}>{problem}</div>
+        <div style={{ fontSize: '0.8125rem', color: '#475569' }}>{solution}</div>
       </div>
     </div>
   )
@@ -611,40 +568,42 @@ function TipCard({ icon, title, feedback }) {
 function FAQItem({ q, a }) {
   const [open, setOpen] = useState(false)
   return (
-    <div
-      style={{
-        background: 'var(--surface)',
-        border: '1px solid var(--border)',
-        borderRadius: 'var(--radius)',
-        overflow: 'hidden',
-      }}
-    >
+    <div style={{
+      background: 'white',
+      border: '1px solid #e2e8f0',
+      borderRadius: '12px',
+      overflow: 'hidden',
+    }}>
       <button
         onClick={() => setOpen(!open)}
         style={{
           width: '100%',
-          padding: '14px 16px',
+          padding: '16px 20px',
           background: 'none',
           border: 'none',
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          color: 'var(--text)',
+          color: '#1e293b',
           fontWeight: 600,
-          fontSize: '0.875rem',
+          fontSize: '0.9375rem',
           textAlign: 'left',
         }}
       >
         <span>{q}</span>
-        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>▼</span>
+        <span style={{
+          fontSize: '0.75rem', color: '#94a3b8',
+          transform: open ? 'rotate(180deg)' : 'none',
+          transition: 'transform 0.2s',
+        }}>▼</span>
       </button>
       {open && (
         <div style={{
-          padding: '0 16px 14px',
-          fontSize: '0.8125rem',
-          color: 'var(--text-muted)',
-          lineHeight: 1.6,
+          padding: '0 20px 16px',
+          fontSize: '0.875rem',
+          color: '#64748b',
+          lineHeight: 1.7,
         }}>
           {a}
         </div>
@@ -659,44 +618,15 @@ const listStyle = {
   paddingLeft: '20px',
   fontSize: '0.875rem',
   lineHeight: 2,
-  color: 'var(--text)',
+  color: '#334155',
 }
 
 const codeStyle = {
-  padding: '2px 6px',
-  background: 'var(--bg)',
-  border: '1px solid var(--border)',
-  borderRadius: '4px',
+  padding: '2px 8px',
+  background: '#f1f5f9',
+  border: '1px solid #e2e8f0',
+  borderRadius: '6px',
   fontSize: '0.8125rem',
   fontFamily: 'monospace',
-}
-
-const tableStyle = {
-  width: '100%',
-  borderCollapse: 'collapse',
-  fontSize: '0.8125rem',
-}
-
-const thStyle = {
-  textAlign: 'left',
-  padding: '8px 12px',
-  borderBottom: '1px solid var(--border)',
-  color: 'var(--text-muted)',
-  fontWeight: 600,
-  fontSize: '0.75rem',
-}
-
-const tdStyle = {
-  padding: '8px 12px',
-  borderBottom: '1px solid var(--border)',
-  color: 'var(--text)',
-  verticalAlign: 'top',
-}
-
-const tdLabelStyle = {
-  ...tdStyle,
-  fontWeight: 600,
-  whiteSpace: 'nowrap',
-  color: 'var(--text-muted)',
-  width: '120px',
+  color: '#6366f1',
 }
