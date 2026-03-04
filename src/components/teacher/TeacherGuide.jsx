@@ -99,14 +99,17 @@ cone({pos: vec(0,1.7,0), axis: vec(0,0,0.8), radius: 0.12, color: color.orange})
   },
   {
     level: 3,
-    emoji: '🗼',
-    title: '색깔 탑',
-    description: '빨-주-노-초-파 5가지 색 상자가 아래에서 위로 차례대로 쌓여 있다',
-    code: `var colors = [color.red, color.orange, color.yellow, color.green, color.blue];
-for (var i = 0; i < 5; i++) {
-    box({pos: vec(0, i*1.1-2, 0), size: vec(1, 1, 1), color: colors[i]});
+    emoji: '🔴',
+    title: '구슬 피라미드',
+    description: '맨 아래 빨간 구 4개, 그 위 초록 구 3개, 파란 구 2개, 맨 위 노란 구 1개 — 총 10개가 피라미드 형태',
+    code: `var colors = [color.red, color.green, color.blue, color.yellow];
+for (var row = 0; row < 4; row++) {
+    var count = 4 - row;
+    for (var i = 0; i < count; i++) {
+        sphere({pos: vec((i - (count-1)/2)*1.2, row*1.1-1.5, 0), radius: 0.45, color: colors[row]});
+    }
 }`,
-    hint: '상자는 몇 개이고, 어떤 색 순서로 쌓여 있나요? 규칙을 찾아보세요.',
+    hint: '각 줄에 구가 몇 개인지, 어떤 색인지, 위로 갈수록 어떻게 줄어드는지 규칙을 설명하세요.',
   },
 ]
 
@@ -300,9 +303,7 @@ function TryItSection() {
           <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             목표 장면
           </div>
-          <div style={{ background: '#1a1a2e', borderRadius: '12px', overflow: 'hidden', height: '280px' }}>
-            <VPythonRunner code={challenge.code} height="280px" />
-          </div>
+          <VPythonRunner code={challenge.code} height="280px" />
           <div style={{
             marginTop: '8px',
             padding: '10px 14px',
@@ -321,19 +322,19 @@ function TryItSection() {
           <div style={{ fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8', marginBottom: '6px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
             내 프롬프트 결과
           </div>
-          <div style={{ background: '#1a1a2e', borderRadius: '12px', overflow: 'hidden', height: '280px', position: 'relative' }}>
-            {resultCode ? (
-              <VPythonRunner code={resultCode} height="280px" />
-            ) : (
-              <div style={{
-                position: 'absolute', inset: 0,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: '#64748b', fontSize: '0.875rem',
-              }}>
-                프롬프트를 제출하면 결과가 여기에 표시됩니다
-              </div>
-            )}
-          </div>
+          {resultCode ? (
+            <VPythonRunner code={resultCode} height="280px" />
+          ) : (
+            <div style={{
+              height: '280px',
+              background: '#1a1a2e',
+              borderRadius: '8px',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: '#64748b', fontSize: '0.875rem',
+            }}>
+              프롬프트를 제출하면 결과가 여기에 표시됩니다
+            </div>
+          )}
         </div>
       </div>
 
