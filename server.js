@@ -104,17 +104,44 @@ io.on('connection', (socket) => {
   })
 
   // 교사 → 전체: 결과 공개
-  socket.on('challenge:reveal', ({ sessionId }) => {
-    // 최신 순위 조회 후 브로드캐스트
-    const rankings = db
-      .prepare(`
-        SELECT t.name, t.color, a.score, a.prompt, a.generated_code
-        FROM attempts a
-        JOIN teams t ON t.id = a.team_id
-        WHERE t.session_id = ?
-        ORDER BY a.score DESC
-      `)
-      .all(sessionId)
+  socket.on('challenge:reveal', ({ sessionId, challengeId }) => {
+    let rankings
+
+    if (challengeId) {
+      // 현재 챌린지의 최고 점수만 (팀당 최고점)
+      rankings = db
+        .prepare(`
+          SELECT t.name, t.color,
+                 MAX(a.score) AS score, a.prompt, a.generated_code
+          FROM attempts a
+          JOIN teams t ON t.id = a.team_id
+          WHERE t.session_id = ? AND a.challenge_id = ?
+          GROUP BY t.id
+          ORDER BY score DESC
+        `)
+        .all(sessionId, challengeId)
+    } else {
+      // challengeId 없으면 전체 attempts
+      rankings = db
+        .prepare(`
+          SELECT t.name, t.color,
+                 MAX(a.score) AS score, a.prompt, a.generated_code
+          FROM attempts a
+          JOIN teams t ON t.id = a.team_id
+          WHERE t.session_id = ?
+          GROUP BY t.id
+          ORDER BY score DESC
+        `)
+        .all(sessionId)
+    }
+
+    // attempts가 없으면 팀 목록으로 대체 (아직 제출 없는 경우)
+    if (rankings.length === 0) {
+      rankings = db
+        .prepare('SELECT name, color, 0 AS score FROM teams WHERE session_id = ?')
+        .all(sessionId)
+    }
+
     io.to(`session:${sessionId}`).emit('result:revealed', { rankings })
   })
 

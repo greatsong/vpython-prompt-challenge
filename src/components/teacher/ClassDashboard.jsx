@@ -64,7 +64,10 @@ export default function ClassDashboard({ sessionId }) {
   }, [chatMessages])
 
   const handleReveal = () => {
-    socketRef.current?.emit('challenge:reveal', { sessionId })
+    socketRef.current?.emit('challenge:reveal', {
+      sessionId,
+      challengeId: currentChallenge?.id,
+    })
   }
 
   // 데모: 프롬프트 → AI 코드 생성
