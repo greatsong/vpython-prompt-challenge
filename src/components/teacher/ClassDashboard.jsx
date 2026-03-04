@@ -42,8 +42,8 @@ export default function ClassDashboard({ sessionId }) {
     socket.on('dashboard:update', loadTeams)
 
     // 학생 등록 실시간 알림
-    socket.on('student:registered', ({ studentNumber, studentName, team }) => {
-      setRecentStudent({ studentNumber, studentName, teamName: team.name })
+    socket.on('student:registered', ({ studentNames, team }) => {
+      setRecentStudent({ studentNames, teamName: team.name })
       loadTeams()
       setTimeout(() => setRecentStudent(null), 4000)
     })
@@ -200,7 +200,7 @@ export default function ClassDashboard({ sessionId }) {
           boxShadow: '0 4px 20px rgba(34, 197, 94, 0.3)',
         }}>
           <span style={{ fontSize: '1.5rem' }}>🎉</span>
-          <span>{recentStudent.studentName} ({recentStudent.studentNumber})</span>
+          <span>{recentStudent.studentNames.join(', ')}</span>
           <span style={{ opacity: 0.8 }}>→</span>
           <span style={{
             padding: '4px 12px',

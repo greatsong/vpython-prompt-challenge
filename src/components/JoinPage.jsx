@@ -40,30 +40,35 @@ function Confetti() {
 export default function JoinPage() {
   const navigate = useNavigate()
   const [teacherCode, setTeacherCode] = useState(() => localStorage.getItem(LS_TEACHER_CODE) || '')
-  const [studentNumber, setStudentNumber] = useState('')
-  const [studentName, setStudentName] = useState('')
+  const [s1Number, setS1Number] = useState('')
+  const [s1Name, setS1Name] = useState('')
+  const [s2Number, setS2Number] = useState('')
+  const [s2Name, setS2Name] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [welcome, setWelcome] = useState(null) // { teamId, teamName, emoji }
+  const [welcome, setWelcome] = useState(null)
 
   const handleJoin = async () => {
     if (!teacherCode.trim()) return setError('수업코드를 입력해주세요')
-    if (!studentNumber.trim()) return setError('학번을 입력해주세요')
-    if (!studentName.trim()) return setError('이름을 입력해주세요')
+    if (!s1Number.trim() || !s1Name.trim()) return setError('팀원 1의 학번과 이름을 입력해주세요')
+    // 팀원 2는 둘 다 비어있으면 OK, 하나만 입력하면 경고
+    if ((s2Number.trim() && !s2Name.trim()) || (!s2Number.trim() && s2Name.trim()))
+      return setError('팀원 2의 학번과 이름을 모두 입력해주세요')
 
     setLoading(true)
     setError('')
     localStorage.setItem(LS_TEACHER_CODE, teacherCode.trim())
 
+    const students = [{ studentNumber: s1Number.trim(), studentName: s1Name.trim() }]
+    if (s2Number.trim() && s2Name.trim()) {
+      students.push({ studentNumber: s2Number.trim(), studentName: s2Name.trim() })
+    }
+
     try {
       const res = await fetch('/api/session/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          teacherCode: teacherCode.trim(),
-          studentNumber: studentNumber.trim(),
-          studentName: studentName.trim(),
-        }),
+        body: JSON.stringify({ teacherCode: teacherCode.trim(), students }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -72,7 +77,6 @@ export default function JoinPage() {
         return
       }
 
-      // 관람 모드
       if (data.spectator) {
         navigate(`/spectator/${data.sessionId}`)
         return
@@ -83,9 +87,9 @@ export default function JoinPage() {
         return
       }
 
-      // 환영 화면 표시 후 이동
       const emoji = WELCOME_EMOJIS[Math.floor(Math.random() * WELCOME_EMOJIS.length)]
-      setWelcome({ teamId: data.teamId, emoji })
+      const names = students.map(s => s.studentName).join(', ')
+      setWelcome({ teamId: data.teamId, emoji, names })
       setTimeout(() => navigate(`/team/${data.teamId}`), 2500)
     } catch (e) {
       setError('서버 연결 실패. 새로고침 후 다시 시도해주세요.')
@@ -122,7 +126,7 @@ export default function JoinPage() {
             fontWeight: 800,
             animation: 'slideUp 0.5s 0.3s ease-out both',
           }}>
-            환영합니다, {studentName}!
+            환영합니다, {welcome.names}!
           </h1>
           <p style={{
             color: 'var(--text-muted)',
@@ -158,7 +162,7 @@ export default function JoinPage() {
     }}>
       <div style={{
         width: '100%',
-        maxWidth: '400px',
+        maxWidth: '420px',
         background: 'var(--surface)',
         border: '1px solid var(--border)',
         borderRadius: 'var(--radius-lg)',
@@ -168,8 +172,8 @@ export default function JoinPage() {
         <h1 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '6px', textAlign: 'center' }}>
           🧠 VPython 프롬프트 챌린지
         </h1>
-        <p style={{ color: 'var(--text-muted)', textAlign: 'center', marginBottom: '28px', fontSize: '0.875rem' }}>
-          학번과 이름을 입력하고 참여하세요
+        <p style={{ color: 'var(--text-muted)', textAlign: 'center', marginBottom: '24px', fontSize: '0.875rem' }}>
+          2인 1팀으로 참여합니다 (1인 참여도 가능)
         </p>
 
         {/* 수업코드 */}
@@ -183,26 +187,75 @@ export default function JoinPage() {
           autoFocus
         />
 
-        {/* 학번 */}
-        <label style={{ ...labelStyle, marginTop: '16px' }}>학번</label>
-        <input
-          value={studentNumber}
-          onChange={(e) => setStudentNumber(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="예: 10101"
-          style={inputStyle}
-          inputMode="numeric"
-        />
+        {/* 팀원 1 (필수) */}
+        <div style={{
+          marginTop: '20px',
+          padding: '16px',
+          background: 'var(--bg)',
+          borderRadius: 'var(--radius)',
+          border: '1px solid var(--border)',
+        }}>
+          <div style={{ fontSize: '0.8125rem', fontWeight: 700, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            👤 팀원 1
+            <span style={{ fontSize: '0.6875rem', fontWeight: 400, color: 'var(--text-muted)' }}>필수</span>
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <div style={{ flex: '0 0 40%' }}>
+              <input
+                value={s1Number}
+                onChange={(e) => setS1Number(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="학번"
+                style={inputStyle}
+                inputMode="numeric"
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <input
+                value={s1Name}
+                onChange={(e) => setS1Name(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="이름"
+                style={inputStyle}
+              />
+            </div>
+          </div>
+        </div>
 
-        {/* 이름 */}
-        <label style={{ ...labelStyle, marginTop: '16px' }}>이름</label>
-        <input
-          value={studentName}
-          onChange={(e) => setStudentName(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="예: 김철수"
-          style={inputStyle}
-        />
+        {/* 팀원 2 (선택) */}
+        <div style={{
+          marginTop: '10px',
+          padding: '16px',
+          background: 'var(--bg)',
+          borderRadius: 'var(--radius)',
+          border: '1px dashed var(--border)',
+        }}>
+          <div style={{ fontSize: '0.8125rem', fontWeight: 700, marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            👤 팀원 2
+            <span style={{ fontSize: '0.6875rem', fontWeight: 400, color: 'var(--text-muted)' }}>선택</span>
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <div style={{ flex: '0 0 40%' }}>
+              <input
+                value={s2Number}
+                onChange={(e) => setS2Number(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="학번"
+                style={inputStyle}
+                inputMode="numeric"
+              />
+            </div>
+            <div style={{ flex: 1 }}>
+              <input
+                value={s2Name}
+                onChange={(e) => setS2Name(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="이름"
+                style={inputStyle}
+              />
+            </div>
+          </div>
+        </div>
 
         {error && (
           <p style={{
@@ -219,7 +272,7 @@ export default function JoinPage() {
           onClick={handleJoin}
           disabled={loading}
           style={{
-            marginTop: '24px',
+            marginTop: '20px',
             width: '100%',
             padding: '14px',
             background: loading ? 'var(--surface2)' : 'var(--accent)',
@@ -254,10 +307,11 @@ const labelStyle = {
 const inputStyle = {
   width: '100%',
   padding: '12px 14px',
-  background: 'var(--bg)',
+  background: 'var(--surface)',
   border: '1px solid var(--border)',
   borderRadius: 'var(--radius)',
   color: 'var(--text)',
   fontSize: '1rem',
   outline: 'none',
+  boxSizing: 'border-box',
 }

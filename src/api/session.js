@@ -57,11 +57,21 @@ router.post('/:id/teams', (req, res) => {
 
 const MAX_TEAMS = 15
 
-// POST /api/session/register — 학생 자기 등록 (학번 + 이름 + 수업코드)
+// POST /api/session/register — 팀 등록 (1~2명 동시 입력)
 router.post('/register', (req, res) => {
-  const { teacherCode, studentNumber, studentName } = req.body
-  if (!teacherCode || !studentNumber || !studentName)
-    return res.status(400).json({ error: '수업코드, 학번, 이름 모두 필요' })
+  const { teacherCode, students } = req.body
+  // students: [{ studentNumber, studentName }, ...] (1~2명)
+  if (!teacherCode || !students || !Array.isArray(students) || students.length === 0)
+    return res.status(400).json({ error: '수업코드와 팀원 정보가 필요합니다' })
+
+  if (students.length > 2)
+    return res.status(400).json({ error: '팀원은 최대 2명입니다' })
+
+  // 필수 필드 확인
+  for (const s of students) {
+    if (!s.studentNumber?.trim() || !s.studentName?.trim())
+      return res.status(400).json({ error: '모든 팀원의 학번과 이름을 입력해주세요' })
+  }
 
   // 수업코드로 활성 세션 찾기
   const session = req.db
@@ -69,15 +79,14 @@ router.post('/register', (req, res) => {
     .get(teacherCode)
   if (!session) return res.status(404).json({ error: '수업을 찾을 수 없습니다. 수업코드를 확인해주세요.' })
 
-  // 중복 등록 방지
+  // 중복 등록 방지 — 첫 번째 학생 기준
   const existing = req.db
     .prepare('SELECT id, team_id FROM students WHERE session_id = ? AND student_number = ?')
-    .get(session.id, studentNumber.trim())
+    .get(session.id, students[0].studentNumber.trim())
   if (existing) {
     if (existing.team_id) {
       return res.json({ sessionId: session.id, teamId: existing.team_id, alreadyRegistered: true })
     }
-    // 관람자로 재접속
     return res.json({ sessionId: session.id, teamId: null, spectator: true, alreadyRegistered: true })
   }
 
@@ -92,54 +101,40 @@ router.post('/register', (req, res) => {
     .prepare('SELECT * FROM teams WHERE session_id = ?')
     .all(session.id)
 
-  // 빈자리 있는 팀 찾기 (멤버 1명인 팀)
-  const incompleteTeam = teams.find(t => {
-    const members = JSON.parse(t.members)
-    return members.length < 2
-  })
-
-  // 15팀 제한: 빈자리도 없고 팀도 꽉 찼으면 관람 모드
-  if (!incompleteTeam && teams.length >= MAX_TEAMS) {
-    // 관람자로 등록 (team_id = null)
-    req.db
-      .prepare('INSERT INTO students (session_id, team_id, student_number, name) VALUES (?, NULL, ?, ?)')
-      .run(session.id, studentNumber.trim(), studentName.trim())
+  // 15팀 제한: 꽉 찼으면 관람 모드
+  if (teams.length >= MAX_TEAMS) {
+    for (const s of students) {
+      req.db
+        .prepare('INSERT INTO students (session_id, team_id, student_number, name) VALUES (?, NULL, ?, ?)')
+        .run(session.id, s.studentNumber.trim(), s.studentName.trim())
+    }
 
     req.io.to(`session:${session.id}:teacher`).emit('student:registered', {
-      studentNumber: studentNumber.trim(),
-      studentName: studentName.trim(),
+      studentNames: students.map(s => s.studentName.trim()),
       team: { name: '관람자', color: '#64748b', members: [] },
     })
 
     return res.json({ sessionId: session.id, teamId: null, spectator: true })
   }
 
-  let teamId = null
+  // 새 팀 생성 (항상 새 팀)
+  const memberNames = students.map(s => s.studentName.trim())
+  const teamName = generateTeamName()
+  const color = teamColors[teams.length % teamColors.length]
+  const result = req.db
+    .prepare('INSERT INTO teams (session_id, name, members, color) VALUES (?, ?, ?, ?)')
+    .run(session.id, teamName, JSON.stringify(memberNames), color)
+  const teamId = result.lastInsertRowid
 
-  if (incompleteTeam) {
-    const members = JSON.parse(incompleteTeam.members)
-    members.push(studentName.trim())
+  for (const s of students) {
     req.db
-      .prepare('UPDATE teams SET members = ? WHERE id = ?')
-      .run(JSON.stringify(members), incompleteTeam.id)
-    teamId = incompleteTeam.id
-  } else {
-    const name = generateTeamName()
-    const color = teamColors[teams.length % teamColors.length]
-    const result = req.db
-      .prepare('INSERT INTO teams (session_id, name, members, color) VALUES (?, ?, ?, ?)')
-      .run(session.id, name, JSON.stringify([studentName.trim()]), color)
-    teamId = result.lastInsertRowid
+      .prepare('INSERT INTO students (session_id, team_id, student_number, name) VALUES (?, ?, ?, ?)')
+      .run(session.id, teamId, s.studentNumber.trim(), s.studentName.trim())
   }
-
-  req.db
-    .prepare('INSERT INTO students (session_id, team_id, student_number, name) VALUES (?, ?, ?, ?)')
-    .run(session.id, teamId, studentNumber.trim(), studentName.trim())
 
   const team = req.db.prepare('SELECT * FROM teams WHERE id = ?').get(teamId)
   req.io.to(`session:${session.id}:teacher`).emit('student:registered', {
-    studentNumber: studentNumber.trim(),
-    studentName: studentName.trim(),
+    studentNames: memberNames,
     team: { ...team, members: JSON.parse(team.members) },
   })
 
