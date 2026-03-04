@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { BATTLE_CHALLENGES } from '../../data/challenges-battle.js'
 import VPythonRunner from '../shared/VPythonRunner.jsx'
-import { generateCode } from '../../utils/claude.js'
+import { generateCode, evaluatePrompt } from '../../utils/claude.js'
 
 const LS_API_KEY = 'vpython_api_key'
 
@@ -192,7 +192,9 @@ function TryItSection() {
   const [selected, setSelected] = useState(0)
   const [prompt, setPrompt] = useState('')
   const [resultCode, setResultCode] = useState(null)
+  const [evalResult, setEvalResult] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [loadingStep, setLoadingStep] = useState('')
   const [error, setError] = useState(null)
 
   const challenge = PRACTICE_CHALLENGES[selected]
@@ -207,15 +209,26 @@ function TryItSection() {
     if (!prompt.trim()) return
     if (!keySaved) return setError('API 키를 먼저 저장해주세요.')
     setLoading(true)
+    setLoadingStep('3D 장면 생성 중...')
     setError(null)
     setResultCode(null)
+    setEvalResult(null)
     try {
       const { code } = await generateCode(prompt.trim())
       setResultCode(code)
+
+      setLoadingStep('프롬프트 평가 중...')
+      const evaluation = await evaluatePrompt({
+        prompt: prompt.trim(),
+        generatedCode: code,
+        targetCode: challenge.code,
+      })
+      setEvalResult(evaluation)
     } catch (e) {
       setError(e.message || 'AI 요청 실패')
     } finally {
       setLoading(false)
+      setLoadingStep('')
     }
   }
 
@@ -276,7 +289,7 @@ function TryItSection() {
         {PRACTICE_CHALLENGES.map((c, i) => (
           <button
             key={i}
-            onClick={() => { setSelected(i); setPrompt(''); setResultCode(null); setError(null) }}
+            onClick={() => { setSelected(i); setPrompt(''); setResultCode(null); setEvalResult(null); setError(null) }}
             style={{
               flex: 1,
               padding: '12px 14px',
@@ -380,7 +393,7 @@ function TryItSection() {
               marginBottom: '2px',
             }}
           >
-            {loading ? '생성 중...' : '제출'}
+            {loading ? loadingStep : '제출'}
           </button>
         </div>
         {error && (
@@ -389,6 +402,71 @@ function TryItSection() {
           </div>
         )}
       </Card>
+
+      {/* 평가 결과 */}
+      {evalResult && (
+        <Card>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+            <span style={{ fontWeight: 700, fontSize: '1.0625rem', color: '#1e293b' }}>평가 결과</span>
+            <span style={{
+              fontSize: '2rem', fontWeight: 900,
+              color: evalResult.score >= 80 ? '#22c55e' : evalResult.score >= 60 ? '#f59e0b' : '#ef4444',
+            }}>
+              {evalResult.score}점
+            </span>
+          </div>
+
+          {/* CT 점수 바 */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
+            {[
+              ['decomposition', '분해'],
+              ['pattern', '패턴인식'],
+              ['abstraction', '추상화'],
+              ['algorithm', '알고리즘'],
+            ].map(([key, label]) => (
+              <div key={key}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '4px' }}>
+                  <span style={{ color: '#64748b' }}>{label}</span>
+                  <span style={{ color: '#1e293b', fontWeight: 600 }}>{evalResult.ct_scores?.[key] ?? 0}/25</span>
+                </div>
+                <div style={{ height: '6px', background: '#f1f5f9', borderRadius: '3px' }}>
+                  <div style={{
+                    height: '100%',
+                    width: `${((evalResult.ct_scores?.[key] ?? 0) / 25) * 100}%`,
+                    background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+                    borderRadius: '3px',
+                    transition: 'width 0.5s ease',
+                  }} />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* 피드백 */}
+          <p style={{ fontSize: '0.9375rem', color: '#475569', lineHeight: 1.7, marginBottom: '12px' }}>
+            {evalResult.feedback}
+          </p>
+
+          {/* 개선점 */}
+          {evalResult.improvements?.length > 0 && (
+            <div style={{
+              padding: '12px 16px',
+              background: '#eff6ff',
+              borderRadius: '10px',
+              borderLeft: '3px solid #3b82f6',
+            }}>
+              <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#1e40af', marginBottom: '6px' }}>
+                개선 포인트
+              </div>
+              <ul style={{ paddingLeft: '16px', fontSize: '0.8125rem', color: '#475569', lineHeight: 1.8 }}>
+                {evalResult.improvements.map((imp, i) => (
+                  <li key={i}>{imp}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </Card>
+      )}
     </div>
   )
 }
