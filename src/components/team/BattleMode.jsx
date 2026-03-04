@@ -143,15 +143,15 @@ export default function BattleMode({ team, socket, rankings }) {
       </div>
 
       {/* 3D 장면 비교 */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+      <div className="scene-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
         <VPythonRunner
           code={currentChallenge.code}
-          height="240px"
+          height="200px"
           label="👁 이 장면을 묘사하세요"
         />
         <VPythonRunner
           code={generatedCode}
-          height="240px"
+          height="200px"
           label="🤖 AI가 만든 장면"
           autoRun={!!generatedCode}
         />
@@ -195,27 +195,24 @@ export default function BattleMode({ team, socket, rankings }) {
           }}
         />
 
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '10px' }}>
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-            Ctrl+Enter로 제출
-          </span>
-          <button
-            onClick={handleSubmit}
-            disabled={loading || !prompt.trim()}
-            style={{
-              padding: '10px 24px',
-              background: loading ? 'var(--surface2)' : 'var(--accent)',
-              color: 'white',
-              border: 'none',
-              borderRadius: 'var(--radius)',
-              fontSize: '0.9375rem',
-              fontWeight: 700,
-              cursor: loading ? 'not-allowed' : 'pointer',
-            }}
-          >
-            {loading ? '생성 중...' : '🚀 제출'}
-          </button>
-        </div>
+        <button
+          onClick={handleSubmit}
+          disabled={loading || !prompt.trim()}
+          style={{
+            marginTop: '10px',
+            width: '100%',
+            padding: '14px 24px',
+            background: loading ? 'var(--surface2)' : 'var(--accent)',
+            color: 'white',
+            border: 'none',
+            borderRadius: 'var(--radius)',
+            fontSize: '1.0625rem',
+            fontWeight: 700,
+            cursor: loading ? 'not-allowed' : 'pointer',
+          }}
+        >
+          {loading ? '생성 중...' : '🚀 제출'}
+        </button>
       </div>
 
       {/* 평가 결과 */}
@@ -234,7 +231,7 @@ export default function BattleMode({ team, socket, rankings }) {
           </div>
 
           {/* CT 점수 바 */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
+          <div className="ct-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '12px' }}>
             {[
               { key: 'abstract', label: '추상화' },
               { key: 'pattern', label: '패턴인식' },
