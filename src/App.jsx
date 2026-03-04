@@ -3,6 +3,7 @@ import TeacherApp from './components/teacher/TeacherApp.jsx'
 import TeamApp from './components/team/TeamApp.jsx'
 import JoinPage from './components/JoinPage.jsx'
 import SpectatorPage from './components/SpectatorPage.jsx'
+import GuidePage from './components/GuidePage.jsx'
 
 export default function App() {
   return (
@@ -16,6 +17,9 @@ export default function App() {
 
         {/* 팀 화면 */}
         <Route path="/team/:teamId" element={<TeamApp />} />
+
+        {/* 교사 안내서 (로그인 없이 접근 가능) */}
+        <Route path="/guide" element={<GuidePage />} />
 
         {/* 관람 모드 */}
         <Route path="/spectator/:sessionId" element={<SpectatorPage />} />

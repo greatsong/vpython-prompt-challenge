@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import ClassSetup from './ClassSetup.jsx'
 import SessionController from './SessionController.jsx'
 import ClassDashboard from './ClassDashboard.jsx'
+import TeacherGuide from './TeacherGuide.jsx'
 
 export default function TeacherApp() {
   const [sessionId, setSessionId] = useState(null)
@@ -31,7 +32,7 @@ export default function TeacherApp() {
         </span>
 
         <div style={{ display: 'flex', gap: '4px' }}>
-          {[['info', '🔗 접속 안내'], ['battle', '🎮 수업 진행']].map(([key, label]) => (
+          {[['info', '🔗 접속 안내'], ['battle', '🎮 수업 진행'], ['guide', '📖 안내서']].map(([key, label]) => (
             <button
               key={key}
               onClick={() => setTab(key)}
@@ -138,6 +139,9 @@ export default function TeacherApp() {
           </button>
         </div>
       )}
+
+      {/* 안내서 탭 */}
+      {tab === 'guide' && <TeacherGuide />}
 
       {/* 수업 진행 탭 */}
       {tab === 'battle' && (
