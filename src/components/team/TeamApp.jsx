@@ -3,33 +3,33 @@ import { useParams } from 'react-router-dom'
 import { createSocket } from '../../utils/socket.js'
 import useSessionStore from '../../store/sessionStore.js'
 import useTeamStore from '../../store/teamStore.js'
-import WaitingScreen from './WaitingScreen.jsx'
 import BattleMode from './BattleMode.jsx'
+
+const WELCOME_MESSAGES = [
+  '오늘의 챌린지를 정복해보세요!',
+  '최고의 프롬프트를 만들어봐요!',
+  '3D 세계를 말로 표현해봐요!',
+  'AI에게 멋진 명령을 내려보세요!',
+  '창의력을 발휘할 시간이에요!',
+]
 
 export default function TeamApp() {
   const { teamId } = useParams()
   const socketRef = useRef(null)
-  const { mode, setMode, setChallenge, setSession } = useSessionStore()
+  const { setChallenge } = useSessionStore()
   const { myTeam, setMyTeam } = useTeamStore()
   const [loading, setLoading] = useState(true)
   const [rankings, setRankings] = useState(null)
+  const [showWelcome, setShowWelcome] = useState(true)
 
   // 팀 정보 로드
   useEffect(() => {
     const init = async () => {
       try {
-        // 팀 정보는 팀 ID로 바로 조회
         const res = await fetch(`/api/team/${teamId}`)
         if (res.ok) {
           const team = await res.json()
           setMyTeam(team)
-
-          // 세션 정보도 로드
-          const sRes = await fetch(`/api/session/${team.session_id}`)
-          if (sRes.ok) {
-            const session = await sRes.json()
-            setSession({ sessionId: team.session_id, mode: session.mode, sessionNumber: session.session_number })
-          }
         }
       } catch (e) {
         console.error(e)
@@ -48,13 +48,7 @@ export default function TeamApp() {
 
     socket.emit('team:join', { sessionId: myTeam.session_id, teamId: myTeam.id })
 
-    socket.on('session:mode-change', ({ mode: newMode }) => {
-      setMode(newMode)
-      setRankings(null)
-    })
-
     socket.on('challenge:started', ({ challengeId }) => {
-      // 챌린지 상세 로드
       fetch(`/api/challenges/${challengeId}`)
         .then((r) => r.json())
         .then(setChallenge)
@@ -65,12 +59,15 @@ export default function TeamApp() {
       setRankings(rankings)
     })
 
-    socket.on('challenge:hint', ({ hint }) => {
-      // 힌트는 BattleMode 내에서 처리
-    })
-
     return () => socket.disconnect()
   }, [myTeam])
+
+  // 환영 화면 자동 숨김
+  useEffect(() => {
+    if (!myTeam || !showWelcome) return
+    const timer = setTimeout(() => setShowWelcome(false), 4000)
+    return () => clearTimeout(timer)
+  }, [myTeam, showWelcome])
 
   if (loading) {
     return (
@@ -88,9 +85,87 @@ export default function TeamApp() {
     )
   }
 
+  const welcomeMsg = WELCOME_MESSAGES[Math.floor(myTeam.id % WELCOME_MESSAGES.length)]
+
   return (
     <div style={{ minHeight: '100vh' }}>
-      {/* 팀 헤더 */}
+      {/* 팀 환영 오버레이 */}
+      {showWelcome && (
+        <div
+          onClick={() => setShowWelcome(false)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 100,
+            background: 'rgba(15, 23, 42, 0.92)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '16px',
+            cursor: 'pointer',
+            animation: 'fadeIn 0.3s ease-out',
+          }}
+        >
+          <div style={{
+            width: '80px',
+            height: '80px',
+            borderRadius: '50%',
+            background: myTeam.color,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '2.5rem',
+            animation: 'bounceIn 0.6s ease-out',
+            boxShadow: `0 0 40px ${myTeam.color}66`,
+          }}>
+            🧠
+          </div>
+          <h1 style={{
+            fontSize: '2rem',
+            fontWeight: 800,
+            animation: 'slideUp 0.5s 0.2s ease-out both',
+          }}>
+            {myTeam.name}
+          </h1>
+          <div style={{
+            display: 'flex',
+            gap: '8px',
+            animation: 'slideUp 0.5s 0.4s ease-out both',
+          }}>
+            {(myTeam.members || []).map((m, i) => (
+              <span key={i} style={{
+                padding: '6px 16px',
+                background: `${myTeam.color}33`,
+                border: `1px solid ${myTeam.color}`,
+                borderRadius: '20px',
+                fontSize: '1rem',
+                fontWeight: 600,
+              }}>
+                {m}
+              </span>
+            ))}
+          </div>
+          <p style={{
+            color: 'var(--text-muted)',
+            fontSize: '1rem',
+            marginTop: '8px',
+            animation: 'slideUp 0.5s 0.6s ease-out both',
+          }}>
+            {welcomeMsg}
+          </p>
+          <p style={{
+            color: 'var(--text-muted)',
+            fontSize: '0.75rem',
+            marginTop: '16px',
+            opacity: 0.6,
+            animation: 'slideUp 0.5s 0.8s ease-out both',
+          }}>
+            화면을 터치하면 시작합니다
+          </p>
+        </div>
+      )}
+
       <header style={{
         padding: '12px 20px',
         background: 'var(--surface)',
@@ -109,28 +184,8 @@ export default function TeamApp() {
         </span>
       </header>
 
-      {/* 모드별 컨텐츠 */}
       <main>
-        {mode === 'waiting' && <WaitingScreen team={myTeam} />}
-        {(mode === 'battle' || mode === 'compare') && (
-          <BattleMode team={myTeam} socket={socketRef} rankings={rankings} />
-        )}
-        {/* 나머지 모드는 Phase 2~4에서 추가 */}
-        {mode === 'detective' && (
-          <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
-            🔍 코드 탐정 모드 (Session 2 — 곧 추가 예정)
-          </div>
-        )}
-        {mode === 'surgery' && (
-          <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
-            ✂️ 코드 수술 모드 (Session 3 — 곧 추가 예정)
-          </div>
-        )}
-        {mode === 'creator' && (
-          <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-muted)' }}>
-            🎨 문제 출제자 모드 (Session 4 — 곧 추가 예정)
-          </div>
-        )}
+        <BattleMode team={myTeam} socket={socketRef} rankings={rankings} />
       </main>
     </div>
   )

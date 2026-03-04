@@ -5,7 +5,7 @@ import VPythonRunner from '../shared/VPythonRunner.jsx'
 import { generateCode, evaluatePrompt, saveAttempt } from '../../utils/claude.js'
 
 export default function BattleMode({ team, socket, rankings }) {
-  const { currentChallenge, sessionNumber } = useSessionStore()
+  const { currentChallenge } = useSessionStore()
   const { attempts, addAttempt } = useTeamStore()
   const [prompt, setPrompt] = useState('')
   const [generatedCode, setGeneratedCode] = useState('')
@@ -44,14 +44,14 @@ export default function BattleMode({ team, socket, rankings }) {
         prompt,
         generatedCode: code,
         targetCode: currentChallenge.code,
-        sessionNumber,
+        sessionNumber: 1,
       })
       setLatestEval(evalResult)
 
       // 3. 저장
       await saveAttempt({
         teamId: team.id,
-        sessionNumber,
+        sessionNumber: 1,
         challengeId: currentChallenge.id,
         prompt,
         generatedCode: code,
@@ -147,7 +147,7 @@ export default function BattleMode({ team, socket, rankings }) {
         <VPythonRunner
           code={currentChallenge.code}
           height="240px"
-          label="🎯 목표 장면"
+          label="👁 이 장면을 묘사하세요"
         />
         <VPythonRunner
           code={generatedCode}

@@ -7,16 +7,10 @@ import { useEffect, useState } from 'react'
  */
 export default function QRDisplay({ sessionId, teams, onEnterClass }) {
   const [qrMap, setQrMap] = useState({})   // { teamId: dataURL }
-  const [serverIp, setServerIp] = useState('localhost')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const init = async () => {
-      // 서버 IP 조회
-      const ipRes = await fetch('/api/network/ip')
-      const { ip } = await ipRes.json()
-      setServerIp(ip)
-
       // 팀별 QR 생성
       const entries = await Promise.all(
         teams.map(async (team) => {
@@ -59,7 +53,7 @@ export default function QRDisplay({ sessionId, teams, onEnterClass }) {
             fontSize: '0.875rem',
             fontFamily: 'monospace',
           }}>
-            http://{serverIp}:4008/team/<span style={{ color: 'var(--accent-hover)' }}>팀번호</span>
+            {window.location.origin}/team/<span style={{ color: 'var(--accent-hover)' }}>팀번호</span>
           </div>
           <button
             onClick={onEnterClass}
@@ -161,7 +155,7 @@ export default function QRDisplay({ sessionId, teams, onEnterClass }) {
         fontSize: '0.8125rem',
         color: 'var(--text-muted)',
       }}>
-        💡 <strong>접속 불가 시</strong>: 칠판에 <code style={{ color: 'var(--accent-hover)' }}>http://{serverIp}:4008</code> 와 팀 번호를 기재하거나, 교사 핫스팟(VPython-Class)으로 연결 후 재시도
+        💡 <strong>접속 불가 시</strong>: 칠판에 <code style={{ color: 'var(--accent-hover)' }}>{window.location.origin}</code> 와 팀 번호를 기재하거나, 교사 핫스팟(VPython-Class)으로 연결 후 재시도
       </div>
     </div>
   )

@@ -77,7 +77,7 @@ export default function VPythonRunner({
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             color: 'var(--text-muted)', fontSize: '0.875rem',
           }}>
-            코드를 입력하면 여기에 3D 장면이 표시됩니다
+            프롬프트를 제출하면 AI가 만든 장면이 여기에 표시됩니다
           </div>
         )}
 
@@ -98,7 +98,6 @@ export default function VPythonRunner({
             src={src}
             style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
             title="VPython Scene"
-            sandbox="allow-scripts allow-same-origin"
           />
         )}
       </div>

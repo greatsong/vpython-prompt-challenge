@@ -32,6 +32,28 @@ router.get('/dashboard/:sessionId', (req, res) => {
   res.json({ teams: teamsWithScores })
 })
 
+// GET /api/dashboard/attempts/:sessionId/:teamId — 특정 팀의 시도 목록
+router.get('/dashboard/attempts/:sessionId/:teamId', (req, res) => {
+  const { sessionId, teamId } = req.params
+
+  const attempts = req.db
+    .prepare(
+      `SELECT a.prompt, a.generated_code, a.score, a.evaluation, a.created_at
+       FROM attempts a
+       JOIN teams t ON t.id = a.team_id
+       WHERE t.session_id = ? AND a.team_id = ?
+       ORDER BY a.created_at DESC`
+    )
+    .all(sessionId, teamId)
+
+  res.json({
+    attempts: attempts.map(a => ({
+      ...a,
+      evaluation: JSON.parse(a.evaluation || '{}'),
+    })),
+  })
+})
+
 // GET /api/growth/:teamId — Session 1 vs 5 성장 비교
 router.get('/growth/:teamId', (req, res) => {
   const { teamId } = req.params

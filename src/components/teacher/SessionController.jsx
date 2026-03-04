@@ -1,113 +1,112 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import useSessionStore from '../../store/sessionStore.js'
 import { BATTLE_CHALLENGES } from '../../data/challenges-battle.js'
-
-const SESSIONS = [
-  { n: 1, title: '말로 만드는 세계', mode: 'battle', icon: '💬' },
-  { n: 2, title: '코드가 보이기 시작한다', mode: 'detective', icon: '🔍' },
-  { n: 3, title: '내 손으로 고치다', mode: 'surgery', icon: '✂️' },
-  { n: 4, title: '백지에서 짓다', mode: 'creator', icon: '🎨' },
-  { n: 5, title: '프롬프트 배틀 2.0', mode: 'compare', icon: '🏆' },
-]
+import { createSocket } from '../../utils/socket.js'
 
 export default function SessionController({ sessionId }) {
-  const { mode, sessionNumber, setMode, setChallenge } = useSessionStore()
+  const { setChallenge } = useSessionStore()
   const [selectedChallenge, setSelectedChallenge] = useState(null)
-  const [loading, setLoading] = useState(false)
+  const [pushed, setPushed] = useState(false)
+  const socketRef = useRef(null)
 
-  const switchMode = async (newMode, newSessionNum) => {
-    setLoading(true)
-    try {
-      await fetch(`/api/session/${sessionId}/mode`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: newMode, sessionNumber: newSessionNum }),
-      })
-      setMode(newMode, newSessionNum)
-    } catch (e) {
-      console.error(e)
-    }
-    setLoading(false)
+  useEffect(() => {
+    const socket = createSocket()
+    socketRef.current = socket
+    socket.emit('teacher:join', { sessionId })
+    return () => socket.disconnect()
+  }, [sessionId])
+
+  const pushChallenge = (c) => {
+    setSelectedChallenge(c)
+    setChallenge(c)
+    setPushed(false)
+    socketRef.current?.emit('challenge:start', {
+      sessionId,
+      challengeId: c.id,
+    })
+    setPushed(true)
+    setTimeout(() => setPushed(false), 2000)
+  }
+
+  const sendHint = () => {
+    if (!selectedChallenge?.hint) return
+    socketRef.current?.emit('challenge:hint', {
+      sessionId,
+      hint: selectedChallenge.hint,
+    })
   }
 
   return (
     <div style={{ padding: '20px' }}>
       <h2 style={{ fontSize: '0.875rem', fontWeight: 700, marginBottom: '16px', color: 'var(--text-muted)' }}>
-        세션 전환
+        챌린지 선택
       </h2>
 
-      {/* 세션 타임라인 */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '24px' }}>
-        {SESSIONS.map((s) => (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginBottom: '16px' }}>
+        {BATTLE_CHALLENGES.map((c) => (
           <button
-            key={s.n}
-            onClick={() => switchMode(s.mode, s.n)}
-            disabled={loading}
+            key={c.id}
+            onClick={() => pushChallenge(c)}
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '10px',
-              padding: '10px 12px',
+              gap: '8px',
+              padding: '8px 10px',
               borderRadius: 'var(--radius)',
               border: '1px solid',
-              borderColor: sessionNumber === s.n ? 'var(--accent)' : 'transparent',
-              background: sessionNumber === s.n ? 'rgba(99,102,241,0.15)' : 'transparent',
-              color: sessionNumber === s.n ? 'var(--accent-hover)' : 'var(--text-muted)',
+              borderColor: selectedChallenge?.id === c.id ? 'var(--success)' : 'transparent',
+              background: selectedChallenge?.id === c.id ? 'rgba(34,197,94,0.1)' : 'transparent',
+              color: 'var(--text)',
               textAlign: 'left',
               cursor: 'pointer',
-              transition: 'all 0.15s',
+              fontSize: '0.8125rem',
             }}
           >
-            <span style={{ fontSize: '1rem' }}>{s.icon}</span>
-            <span style={{ fontSize: '0.8125rem', fontWeight: sessionNumber === s.n ? 700 : 400 }}>
-              {s.n}. {s.title}
+            <span>{c.emoji}</span>
+            <span style={{ flex: 1 }}>{c.title}</span>
+            <span style={{
+              fontSize: '0.6875rem',
+              color: ['', 'var(--success)', 'var(--warning)', 'var(--danger)'][c.level],
+              fontWeight: 700,
+            }}>
+              Lv{c.level}
             </span>
           </button>
         ))}
       </div>
 
-      {/* 챌린지 선택 (Battle 모드일 때) */}
-      {(mode === 'battle' || mode === 'compare') && (
-        <>
-          <h2 style={{ fontSize: '0.875rem', fontWeight: 700, marginBottom: '10px', color: 'var(--text-muted)' }}>
-            챌린지 선택
-          </h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            {BATTLE_CHALLENGES.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => {
-                  setSelectedChallenge(c)
-                  setChallenge(c)
-                }}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '8px 10px',
-                  borderRadius: 'var(--radius)',
-                  border: '1px solid',
-                  borderColor: selectedChallenge?.id === c.id ? 'var(--success)' : 'transparent',
-                  background: selectedChallenge?.id === c.id ? 'rgba(34,197,94,0.1)' : 'transparent',
-                  color: 'var(--text)',
-                  textAlign: 'left',
-                  cursor: 'pointer',
-                  fontSize: '0.8125rem',
-                }}
-              >
-                <span>{c.emoji}</span>
-                <span style={{ flex: 1 }}>{c.title}</span>
-                <span style={{
-                  fontSize: '0.6875rem',
-                  color: ['','var(--success)','var(--warning)','var(--danger)'][c.level],
-                  fontWeight: 700,
-                }}>
-                  Lv{c.level}
-                </span>
-              </button>
-            ))}
-          </div>
-        </>
+      {selectedChallenge?.hint && (
+        <button
+          onClick={sendHint}
+          style={{
+            width: '100%',
+            padding: '10px',
+            background: 'rgba(234,179,8,0.15)',
+            border: '1px solid var(--warning)',
+            borderRadius: 'var(--radius)',
+            color: 'var(--warning)',
+            fontSize: '0.8125rem',
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          💡 힌트 전송
+        </button>
+      )}
+
+      {pushed && (
+        <div style={{
+          marginTop: '12px',
+          padding: '8px 12px',
+          background: 'rgba(34,197,94,0.15)',
+          border: '1px solid var(--success)',
+          borderRadius: 'var(--radius)',
+          color: 'var(--success)',
+          fontSize: '0.8125rem',
+          textAlign: 'center',
+        }}>
+          ✓ 팀 화면에 전송됨
+        </div>
       )}
     </div>
   )

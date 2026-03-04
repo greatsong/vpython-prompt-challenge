@@ -7,22 +7,36 @@ export function buildGlowScriptHTML(code) {
   return `<!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8">
-  <title>VPython Scene</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #1a1a2e; overflow: hidden; }
-    canvas { display: block; }
-  </style>
+<meta charset="utf-8">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; }
+  .glowscript { width: 100% !important; padding: 0 !important; margin: 0 !important; }
+  div > canvas { display: block; }
+</style>
 </head>
 <body>
-<script type="text/javascript"
-  src="https://www.glowscript.org/lib/GlowScript-3.2-min.js"></script>
 <div id="glowscript" class="glowscript">
-<script type="text/glowscript" contenteditable="false">
-GlowScript 3.2 VPython
-${code}
-</script>
+<link type="text/css" href="https://www.glowscript.org/css/redmond/2.1/jquery-ui.custom.css" rel="stylesheet" />
+<link type="text/css" href="https://www.glowscript.org/css/ide.css" rel="stylesheet" />
+<script type="text/javascript" src="https://www.glowscript.org/lib/jquery/2.1/jquery.min.js"></script>
+<script type="text/javascript" src="https://www.glowscript.org/lib/jquery/2.1/jquery-ui.custom.min.js"></script>
+<script type="text/javascript" src="https://www.glowscript.org/package/glow.3.2.min.js"></script>
+<script type="text/javascript" src="https://www.glowscript.org/package/RSrun.3.2.min.js"></script>
+<script type="text/javascript"><!--//--><![CDATA[//><!--
+;(function() {
+function __main__() {
+    var scene = canvas();
+    scene.width = window.innerWidth;
+    scene.height = window.innerHeight;
+    scene.userspin = true;
+    scene.userzoom = true;
+    scene.userpan = true;
+    ${code}
+}
+;$(function(){ window.__context = { glowscript_container: $("#glowscript").removeAttr("id") }; __main__() })})()
+document.addEventListener('contextmenu', function(e){ e.preventDefault(); });
+//--><!]]></script>
 </div>
 </body>
 </html>`

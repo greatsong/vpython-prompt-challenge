@@ -2,14 +2,11 @@ services:
   - type: web
     name: vpython-prompt-challenge
     runtime: node
+    plan: free
     buildCommand: npm install && npm run build
-    startCommand: npm start
+    startCommand: node server.js
     envVars:
       - key: ANTHROPIC_API_KEY
         sync: false
       - key: NODE_ENV
         value: production
-    disk:
-      name: db
-      mountPath: /app/db
-      sizeGB: 1

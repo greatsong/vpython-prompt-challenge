@@ -93,12 +93,6 @@ io.on('connection', (socket) => {
     console.log(`[Socket] 팀 입장: session=${sessionId}, team=${teamId}`)
   })
 
-  // 교사 → 전체: 세션 모드 전환
-  socket.on('session:mode-change', ({ sessionId, mode, challenge }) => {
-    io.to(`session:${sessionId}`).emit('session:mode-change', { mode, challenge })
-    console.log(`[Socket] 모드 전환: session=${sessionId}, mode=${mode}`)
-  })
-
   // 교사 → 전체: 챌린지 시작
   socket.on('challenge:start', ({ sessionId, challengeId, timeLimit }) => {
     io.to(`session:${sessionId}`).emit('challenge:started', { challengeId, timeLimit })

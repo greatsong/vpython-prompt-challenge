@@ -5,13 +5,20 @@
 
 const BASE = '/api'
 
+function getHeaders() {
+  const key = localStorage.getItem('vpython_api_key')
+  const headers = { 'Content-Type': 'application/json' }
+  if (key) headers['X-API-Key'] = key
+  return headers
+}
+
 /**
  * 프롬프트로 VPython 코드 생성 (Haiku)
  */
 export async function generateCode(prompt) {
   const res = await fetch(`${BASE}/generate`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getHeaders(),
     body: JSON.stringify({ prompt }),
   })
   if (!res.ok) throw new Error(await res.text())
@@ -24,7 +31,7 @@ export async function generateCode(prompt) {
 export async function evaluatePrompt({ prompt, generatedCode, targetCode, sessionNumber }) {
   const res = await fetch(`${BASE}/evaluate`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getHeaders(),
     body: JSON.stringify({ prompt, generatedCode, targetCode, sessionNumber }),
   })
   if (!res.ok) throw new Error(await res.text())
@@ -37,7 +44,7 @@ export async function evaluatePrompt({ prompt, generatedCode, targetCode, sessio
 export async function analyzeProblem({ code, title, difficulty }) {
   const res = await fetch(`${BASE}/analyze-problem`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getHeaders(),
     body: JSON.stringify({ code, title, difficulty }),
   })
   if (!res.ok) throw new Error(await res.text())
@@ -50,7 +57,7 @@ export async function analyzeProblem({ code, title, difficulty }) {
 export async function evaluateProblemQuality({ problemCode, solverPrompt, solverScore }) {
   const res = await fetch(`${BASE}/evaluate-problem-quality`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getHeaders(),
     body: JSON.stringify({ problemCode, solverPrompt, solverScore }),
   })
   if (!res.ok) throw new Error(await res.text())
@@ -63,7 +70,7 @@ export async function evaluateProblemQuality({ problemCode, solverPrompt, solver
 export async function saveAttempt(data) {
   const res = await fetch(`${BASE}/attempts`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getHeaders(),
     body: JSON.stringify(data),
   })
   if (!res.ok) throw new Error(await res.text())

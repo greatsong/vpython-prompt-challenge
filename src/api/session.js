@@ -5,30 +5,29 @@ import { generateTeamName } from '../data/teamNames.js'
 
 const router = Router()
 
-// POST /api/session/create — 새 수업 세션 생성
+// POST /api/session/create — 새 수업 생성 (내부적으로 UUID 생성)
 router.post('/create', (req, res) => {
-  const { teacherCode, sessionNumber = 1 } = req.body
+  const { teacherCode } = req.body
   if (!teacherCode) return res.status(400).json({ error: 'teacherCode 필요' })
 
   const id = randomUUID()
   req.db
     .prepare(
-      'INSERT INTO sessions (id, teacher_code, session_number) VALUES (?, ?, ?)'
+      'INSERT INTO sessions (id, teacher_code, session_number) VALUES (?, ?, 1)'
     )
-    .run(id, teacherCode, sessionNumber)
+    .run(id, teacherCode)
 
-  res.json({ sessionId: id, teacherCode, sessionNumber })
+  res.json({ sessionId: id, teacherCode })
 })
 
 // POST /api/session/:id/teams — 팀 자동 구성
 router.post('/:id/teams', (req, res) => {
   const { id } = req.params
-  const { students } = req.body  // string[] 학생 이름 목록
+  const { students } = req.body
 
   if (!students || students.length === 0)
     return res.status(400).json({ error: '학생 명단 필요' })
 
-  // 2인 1팀으로 구성
   const teamColors = [
     '#ef4444','#f97316','#eab308','#22c55e',
     '#14b8a6','#3b82f6','#8b5cf6','#ec4899',
@@ -56,42 +55,85 @@ router.post('/:id/teams', (req, res) => {
   res.json({ teams })
 })
 
-// GET /api/session/:id/teams — 팀 목록
-router.get('/:id/teams', (req, res) => {
+// POST /api/session/register — 학생 자기 등록 (학번 + 이름 + 수업코드)
+router.post('/register', (req, res) => {
+  const { teacherCode, studentNumber, studentName } = req.body
+  if (!teacherCode || !studentNumber || !studentName)
+    return res.status(400).json({ error: '수업코드, 학번, 이름 모두 필요' })
+
+  // 수업코드로 활성 세션 찾기
+  const session = req.db
+    .prepare("SELECT id FROM sessions WHERE teacher_code = ? AND status != 'ended' ORDER BY created_at DESC LIMIT 1")
+    .get(teacherCode)
+  if (!session) return res.status(404).json({ error: '수업을 찾을 수 없습니다. 수업코드를 확인해주세요.' })
+
+  // 중복 등록 방지
+  const existing = req.db
+    .prepare('SELECT id, team_id FROM students WHERE session_id = ? AND student_number = ?')
+    .get(session.id, studentNumber.trim())
+  if (existing) {
+    // 이미 등록된 학생 → 기존 팀으로 보내기
+    return res.json({ sessionId: session.id, teamId: existing.team_id, alreadyRegistered: true })
+  }
+
+  const teamColors = [
+    '#ef4444','#f97316','#eab308','#22c55e',
+    '#14b8a6','#3b82f6','#8b5cf6','#ec4899',
+    '#06b6d4','#84cc16','#f59e0b','#10b981',
+    '#6366f1','#a855f7',
+  ]
+
+  // 빈자리 있는 팀 찾기 (멤버 1명인 팀)
   const teams = req.db
     .prepare('SELECT * FROM teams WHERE session_id = ?')
-    .all(req.params.id)
+    .all(session.id)
 
-  res.json({
-    teams: teams.map((t) => ({ ...t, members: JSON.parse(t.members) })),
+  let teamId = null
+  const incompleteTeam = teams.find(t => {
+    const members = JSON.parse(t.members)
+    return members.length < 2
   })
-})
 
-// PATCH /api/session/:id/mode — 세션 모드 전환 (Socket emit 포함)
-router.patch('/:id/mode', (req, res) => {
-  const { mode, sessionNumber } = req.body
-  const validModes = ['battle', 'detective', 'surgery', 'creator', 'compare']
-  if (!validModes.includes(mode))
-    return res.status(400).json({ error: '유효하지 않은 모드' })
+  if (incompleteTeam) {
+    // 기존 팀에 합류
+    const members = JSON.parse(incompleteTeam.members)
+    members.push(studentName.trim())
+    req.db
+      .prepare('UPDATE teams SET members = ? WHERE id = ?')
+      .run(JSON.stringify(members), incompleteTeam.id)
+    teamId = incompleteTeam.id
+  } else {
+    // 새 팀 생성
+    const name = generateTeamName()
+    const color = teamColors[teams.length % teamColors.length]
+    const result = req.db
+      .prepare('INSERT INTO teams (session_id, name, members, color) VALUES (?, ?, ?, ?)')
+      .run(session.id, name, JSON.stringify([studentName.trim()]), color)
+    teamId = result.lastInsertRowid
+  }
 
+  // 학생 레코드 생성
   req.db
-    .prepare(
-      'UPDATE sessions SET mode = ?, session_number = COALESCE(?, session_number) WHERE id = ?'
-    )
-    .run(mode, sessionNumber ?? null, req.params.id)
+    .prepare('INSERT INTO students (session_id, team_id, student_number, name) VALUES (?, ?, ?, ?)')
+    .run(session.id, teamId, studentNumber.trim(), studentName.trim())
 
-  // Socket.io로 모든 팀에 브로드캐스트
-  req.io.to(`session:${req.params.id}`).emit('session:mode-change', { mode })
+  // Socket.io로 교사에게 알림
+  const team = req.db.prepare('SELECT * FROM teams WHERE id = ?').get(teamId)
+  req.io.to(`session:${session.id}:teacher`).emit('student:registered', {
+    studentNumber: studentNumber.trim(),
+    studentName: studentName.trim(),
+    team: { ...team, members: JSON.parse(team.members) },
+  })
 
-  res.json({ mode, sessionNumber })
+  res.json({ sessionId: session.id, teamId, alreadyRegistered: false })
 })
 
-// GET /api/session/latest/teams — 가장 최근 세션의 팀 목록 (학생 접속용)
+// GET /api/session/latest/teams — 가장 최근 수업의 팀 목록 (학생 접속용)
 router.get('/latest/teams', (req, res) => {
   const session = req.db
     .prepare("SELECT id FROM sessions WHERE status != 'ended' ORDER BY created_at DESC LIMIT 1")
     .get()
-  if (!session) return res.status(404).json({ error: '활성 세션 없음' })
+  if (!session) return res.status(404).json({ error: '활성 수업 없음' })
 
   const teams = req.db
     .prepare('SELECT * FROM teams WHERE session_id = ?')
@@ -106,18 +148,19 @@ router.get('/latest/teams', (req, res) => {
 // GET /api/session/:id/qr — 팀별 QR코드
 router.get('/:id/qr', async (req, res) => {
   const { teamId } = req.query
-  const host = req.headers.host?.split(':')[0] || 'localhost'
-  const url = `http://${host}:4008/team/${teamId}`
+  const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http'
+  const host = req.headers.host || 'localhost:4009'
+  const url = `${protocol}://${host}/team/${teamId}`
   const qr = await QRCode.toDataURL(url)
   res.json({ url, qr })
 })
 
-// GET /api/session/:id — 세션 정보
+// GET /api/session/:id — 수업 정보
 router.get('/:id', (req, res) => {
   const session = req.db
     .prepare('SELECT * FROM sessions WHERE id = ?')
     .get(req.params.id)
-  if (!session) return res.status(404).json({ error: '세션 없음' })
+  if (!session) return res.status(404).json({ error: '수업 없음' })
   res.json(session)
 })
 
