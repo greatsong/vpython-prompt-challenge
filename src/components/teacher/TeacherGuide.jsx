@@ -8,6 +8,7 @@ const LS_API_KEY = 'vpython_api_key'
 const sections = [
   { id: 'overview', icon: '🌍', label: '서비스 소개' },
   { id: 'tryit', icon: '🎮', label: '직접 체험하기' },
+  { id: 'lesson', icon: '📋', label: '강의안' },
   { id: 'howto', icon: '🚀', label: '수업 진행 방법' },
   { id: 'challenges', icon: '🎯', label: '챌린지 구성' },
   { id: 'tips', icon: '💡', label: '운영 팁' },
@@ -67,6 +68,7 @@ export default function TeacherGuide() {
       }}>
         {activeSection === 'overview' && <OverviewSection />}
         {activeSection === 'tryit' && <TryItSection />}
+        {activeSection === 'lesson' && <LessonPlanSection />}
         {activeSection === 'howto' && <HowtoSection />}
         {activeSection === 'challenges' && <ChallengesSection />}
         {activeSection === 'tips' && <TipsSection />}
@@ -467,6 +469,141 @@ function TryItSection() {
           )}
         </Card>
       )}
+    </div>
+  )
+}
+
+function LessonPlanSection() {
+  return (
+    <div>
+      <SectionTitle>강의안 (100분)</SectionTitle>
+      <p style={{ fontSize: '0.9375rem', lineHeight: 1.7, color: '#475569', marginBottom: '20px' }}>
+        고등학교 1학년 정보 교과 · 핵심 주제: <strong>문제 정의(Problem Definition)</strong>
+      </p>
+
+      {/* 타임라인 */}
+      <Card>
+        <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: '#6366f1', marginBottom: '12px' }}>전체 타임라인</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+          {[
+            { time: '0~12분', label: '0부: 문제 정의란 무엇인가', color: '#6366f1', items: ['수업 도입 — "맛있는 거 사와" 질문', 'VPython 소개 데모', '실패 쇼 — "신호등 만들어줘"'] },
+            { time: '12~30분', label: '1부: 종이 게임 — 아날로그 문제 정의', color: '#8b5cf6', items: ['Round 1: 단순 장면 (빨간 원)', 'Round 2: 관계 추가 (사각형 + 원)'] },
+            { time: '30~82분', label: '2부: VPython 글로 코딩 챌린지', color: '#a78bfa', items: ['접속 세팅 (5분)', '챌린지 진행 + 성찰 (52분)'] },
+            { time: '82~100분', label: '3부: 전체 회고 — 문제 정의 × AI', color: '#c084fc', items: ['오늘 배운 것 회수', 'AI 시대에 왜 문제 정의가 중요한가', '팀별 성찰 발표'] },
+          ].map((phase, i) => (
+            <div key={i} style={{
+              padding: '14px 16px',
+              background: '#f8fafc',
+              borderRadius: '10px',
+              borderLeft: `3px solid ${phase.color}`,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+                <span style={{
+                  fontSize: '0.6875rem', fontWeight: 700, color: 'white',
+                  background: phase.color, padding: '2px 10px', borderRadius: '12px',
+                }}>{phase.time}</span>
+                <span style={{ fontWeight: 600, fontSize: '0.875rem', color: '#1e293b' }}>{phase.label}</span>
+              </div>
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', paddingLeft: '4px' }}>
+                {phase.items.map((item, j) => (
+                  <span key={j} style={{ fontSize: '0.75rem', color: '#64748b', background: 'white', padding: '2px 10px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                    {item}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
+
+      {/* 0부 상세 */}
+      <SubTitle>0부: 문제 정의란 무엇인가 (12분)</SubTitle>
+      <Card>
+        <ScriptBlock speaker="도입 질문" color="#6366f1">
+          "친구한테 '맛있는 거 사와'라고 심부름을 시키면 어떻게 될까요?"
+          → 기대와 다른 결과 경험 공유 → <strong>"문제 정의가 부족했기 때문"</strong>이라는 개념 도출
+        </ScriptBlock>
+        <ScriptBlock speaker="VPython 소개" color="#8b5cf6">
+          3D 물체를 코드로 만드는 도구. 데모 실행 후 "오늘은 코딩 안 해요. <strong>글로 코딩</strong>할 거예요."
+        </ScriptBlock>
+        <ScriptBlock speaker="실패 쇼" color="#ef4444">
+          교사가 <strong>"신호등 만들어줘"</strong>를 입력 → 기대와 다른 결과 → "AI가 몰라서일까요, 제가 설명을 잘못한 걸까요?"
+          <br />→ 수업 전체의 탐구 동기 생성. 이 질문은 3부에서 회수.
+        </ScriptBlock>
+      </Card>
+
+      {/* 1부 상세 */}
+      <SubTitle>1부: 종이 게임 — 아날로그 문제 정의 (18분)</SubTitle>
+      <Card>
+        <div style={{ fontSize: '0.8125rem', color: '#475569', lineHeight: 1.7, marginBottom: '12px' }}>
+          2인 1팀. A는 화면을 보고 <strong>말로 설명</strong>, B는 등을 돌리고 <strong>표준 도형 카드로 장면을 재현</strong>.
+          B는 질문 가능 — "질문할 수 있다"는 것이 핵심 포인트.
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+          <div style={{ padding: '12px', background: '#f0fdf4', borderRadius: '10px', border: '1px solid #bbf7d022' }}>
+            <div style={{ fontWeight: 600, fontSize: '0.8125rem', color: '#16a34a', marginBottom: '4px' }}>Round 1 — 단순 장면 (8분)</div>
+            <div style={{ fontSize: '0.8125rem', color: '#475569' }}>검정 배경에 빨간 원 하나<br />핵심 발견: <strong>크기, 위치, 기준</strong>이 없으면 상대가 마음대로 채움</div>
+          </div>
+          <div style={{ padding: '12px', background: '#eff6ff', borderRadius: '10px', border: '1px solid #bfdbfe22' }}>
+            <div style={{ fontWeight: 600, fontSize: '0.8125rem', color: '#2563eb', marginBottom: '4px' }}>Round 2 — 관계 추가 (7분)</div>
+            <div style={{ fontSize: '0.8125rem', color: '#475569' }}>파란 사각형 위에 초록 원<br />핵심 발견: <strong>"안에" vs "위에"</strong> — 관계 표현의 중요성</div>
+          </div>
+        </div>
+      </Card>
+
+      {/* 2부 상세 */}
+      <SubTitle>2부: VPython 글로 코딩 챌린지 (52분)</SubTitle>
+      <p style={{ fontSize: '0.8125rem', color: '#64748b', marginBottom: '12px' }}>
+        각 챌린지: 문제 제시(2분) → 팀 활동 + 교사 순회(8분) → 결과 공개 + 성찰(6분)
+      </p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
+        <ChallengeScript
+          num={1} time="35~52분" title="분해(Decomposition)"
+          color="#22c55e"
+          target="목표 장면을 부품으로 분해하기"
+          key_moment='"신호등 만들어줘" → AI가 알고 있는 신호등 ≠ 내가 원하는 신호등'
+          takeaway="부품(기둥, 공 3개)으로 분해하고 각각의 속성(크기, 색, 위치)을 정의해야 원하는 결과가 나온다"
+        />
+        <ChallengeScript
+          num={2} time="52~68분" title="패턴인식(Pattern Recognition)"
+          color="#f59e0b"
+          target="반복 구조에서 규칙 찾기"
+          key_moment="꽃잎 6개의 위치를 어떻게 설명? → 60도씩 반복이라는 패턴 발견"
+          takeaway="패턴을 찾으면 설명이 짧아진다. 6개를 일일이 쓰는 대신 '60도 간격'으로 압축"
+        />
+        <ChallengeScript
+          num={3} time="68~82분" title="추상화(Abstraction)"
+          color="#ef4444"
+          target="반복 요소를 정의하고 재사용하기"
+          key_moment='"나무 = 갈색 기둥 + 초록 구"로 정의 → 위치만 바꿔 5번 배치'
+          takeaway="복잡한 것을 단순한 정의로 압축하는 것이 추상화. 나무가 100개여도 정의 한 번이면 끝"
+        />
+      </div>
+
+      {/* 3부 상세 */}
+      <SubTitle>3부: 전체 회고 (18분)</SubTitle>
+      <Card>
+        <ScriptBlock speaker="질문 회수" color="#6366f1">
+          "0부에서 '신호등 만들어줘'가 실패했죠. 이제 왜 실패했는지 알 것 같아요?"
+          <br />→ "AI 잘못이었나요, 제 잘못이었나요?" → <strong>"AI는 알고 있었지만, 내가 원하는 것을 몰랐다"</strong>
+        </ScriptBlock>
+        <ScriptBlock speaker="CT 연결" color="#8b5cf6">
+          챌린지 1: <strong>분해</strong> — 부품으로 나누기<br />
+          챌린지 2: <strong>패턴인식</strong> — 규칙 찾기<br />
+          챌린지 3: <strong>추상화</strong> — 정의하고 재사용
+        </ScriptBlock>
+        <ScriptBlock speaker="핵심 메시지" color="#c084fc">
+          "AI 시대에 가장 중요한 역량은 코드를 잘 짜는 것이 아니라 <strong>무엇을 만들어야 하는지 정확히 정의하는 것</strong>이다."
+        </ScriptBlock>
+      </Card>
+
+      {/* 수업 자료 다운로드 */}
+      <SubTitle>수업 자료</SubTitle>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px' }}>
+        <MaterialCard emoji="📑" title="수업 시나리오" desc="100분 수업 전체 대본 (교사 멘트, 예상 반응, 타이밍)" />
+        <MaterialCard emoji="🃏" title="표준 도형 카드" desc="1부 종이 게임용 — 원, 사각형, 삼각형 카드 세트" />
+        <MaterialCard emoji="📊" title="학습 체크리스트" desc="수업 후 확인 — 분해·패턴·추상화 개념 도달 여부" />
+      </div>
     </div>
   )
 }
@@ -913,6 +1050,69 @@ function FAQItem({ q, a }) {
           {a}
         </div>
       )}
+    </div>
+  )
+}
+
+function ScriptBlock({ speaker, color, children }) {
+  return (
+    <div style={{
+      padding: '12px 16px',
+      background: '#f8fafc',
+      borderRadius: '10px',
+      borderLeft: `3px solid ${color}`,
+      marginBottom: '10px',
+    }}>
+      <div style={{ fontSize: '0.75rem', fontWeight: 700, color, marginBottom: '4px' }}>{speaker}</div>
+      <div style={{ fontSize: '0.8125rem', color: '#475569', lineHeight: 1.7 }}>{children}</div>
+    </div>
+  )
+}
+
+function ChallengeScript({ num, time, title, color, target, key_moment, takeaway }) {
+  return (
+    <div style={{
+      background: 'white',
+      border: '1px solid #e2e8f0',
+      borderRadius: '12px',
+      padding: '16px 20px',
+      borderLeft: `4px solid ${color}`,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+        <div style={{
+          width: '28px', height: '28px', borderRadius: '50%',
+          background: color, color: 'white',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontWeight: 700, fontSize: '0.8125rem', flexShrink: 0,
+        }}>{num}</div>
+        <div>
+          <span style={{ fontWeight: 700, fontSize: '0.9375rem', color: '#1e293b' }}>챌린지 {num}: {title}</span>
+          <span style={{ fontSize: '0.75rem', color: '#94a3b8', marginLeft: '8px' }}>{time}</span>
+        </div>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.8125rem', color: '#475569', lineHeight: 1.6 }}>
+        <div><span style={{ fontWeight: 600, color: '#1e293b' }}>목표:</span> {target}</div>
+        <div><span style={{ fontWeight: 600, color: '#1e293b' }}>핵심 순간:</span> {key_moment}</div>
+        <div style={{ padding: '8px 12px', background: `${color}08`, borderRadius: '8px', border: `1px solid ${color}20` }}>
+          <span style={{ fontWeight: 600, color }}>정리:</span> {takeaway}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function MaterialCard({ emoji, title, desc }) {
+  return (
+    <div style={{
+      padding: '18px',
+      background: 'white',
+      border: '1px solid #e2e8f0',
+      borderRadius: '12px',
+      textAlign: 'center',
+    }}>
+      <div style={{ fontSize: '1.75rem', marginBottom: '8px' }}>{emoji}</div>
+      <div style={{ fontWeight: 600, fontSize: '0.875rem', color: '#1e293b', marginBottom: '4px' }}>{title}</div>
+      <div style={{ fontSize: '0.8125rem', color: '#64748b', lineHeight: 1.5 }}>{desc}</div>
     </div>
   )
 }
