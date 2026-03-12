@@ -26,11 +26,20 @@ export const CHARACTERS = [
 ]
 
 /**
- * 랜덤 팀 이름 생성
+ * 중복 없는 랜덤 팀 이름 생성
+ * @param {string[]} existingNames - 이미 사용 중인 팀 이름 목록
  * @returns {string} 예: "졸린 카피바라"
  */
-export function generateTeamName() {
+export function generateTeamName(existingNames = []) {
+  const maxAttempts = 100
+  for (let i = 0; i < maxAttempts; i++) {
+    const adj = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)]
+    const char = CHARACTERS[Math.floor(Math.random() * CHARACTERS.length)]
+    const name = `${adj} ${char}`
+    if (!existingNames.includes(name)) return name
+  }
+  // 극히 드문 경우: 번호 붙여서 반환
   const adj = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)]
   const char = CHARACTERS[Math.floor(Math.random() * CHARACTERS.length)]
-  return `${adj} ${char}`
+  return `${adj} ${char} ${Date.now() % 1000}`
 }

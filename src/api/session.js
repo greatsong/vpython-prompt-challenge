@@ -38,9 +38,11 @@ router.post('/:id/teams', (req, res) => {
   const shuffled = [...students].sort(() => Math.random() - 0.5)
   const teams = []
 
+  const usedNames = []
   for (let i = 0; i < shuffled.length; i += 2) {
     const members = shuffled.slice(i, i + 2)
-    const name = generateTeamName()
+    const name = generateTeamName(usedNames)
+    usedNames.push(name)
     const color = teamColors[teams.length % teamColors.length]
 
     const result = req.db
@@ -119,7 +121,8 @@ router.post('/register', (req, res) => {
 
   // 새 팀 생성 (항상 새 팀)
   const memberNames = students.map(s => s.studentName.trim())
-  const teamName = generateTeamName()
+  const existingNames = teams.map(t => t.name)
+  const teamName = generateTeamName(existingNames)
   const color = teamColors[teams.length % teamColors.length]
   const result = req.db
     .prepare('INSERT INTO teams (session_id, name, members, color) VALUES (?, ?, ?, ?)')

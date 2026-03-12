@@ -21,6 +21,7 @@ export default function TeamApp() {
   const { myTeam, setMyTeam } = useTeamStore()
   const [loading, setLoading] = useState(true)
   const [rankings, setRankings] = useState(null)
+  const [challengeEnded, setChallengeEnded] = useState(false)
   const [showWelcome, setShowWelcome] = useState(true)
 
   // 팀 정보 로드
@@ -50,10 +51,16 @@ export default function TeamApp() {
     socket.emit('team:join', { sessionId: myTeam.session_id, teamId: myTeam.id })
 
     socket.on('challenge:started', ({ challengeId }) => {
+      setChallengeEnded(false)
+      setRankings(null)
       fetch(`/api/challenges/${challengeId}`)
         .then((r) => r.json())
         .then(setChallenge)
         .catch(console.error)
+    })
+
+    socket.on('challenge:ended', () => {
+      setChallengeEnded(true)
     })
 
     socket.on('result:revealed', ({ rankings }) => {
@@ -186,7 +193,7 @@ export default function TeamApp() {
       </header>
 
       <main>
-        <BattleMode team={myTeam} socket={socketRef} rankings={rankings} />
+        <BattleMode team={myTeam} socket={socketRef} rankings={rankings} challengeEnded={challengeEnded} />
       </main>
 
       {/* 채팅 패널 */}

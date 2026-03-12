@@ -4,7 +4,7 @@ import useTeamStore from '../../store/teamStore.js'
 import VPythonRunner from '../shared/VPythonRunner.jsx'
 import { generateCode, evaluatePrompt, saveAttempt } from '../../utils/claude.js'
 
-export default function BattleMode({ team, socket, rankings }) {
+export default function BattleMode({ team, socket, rankings, challengeEnded }) {
   const { currentChallenge } = useSessionStore()
   const { attempts, addAttempt } = useTeamStore()
   const [prompt, setPrompt] = useState('')
@@ -210,21 +210,21 @@ export default function BattleMode({ team, socket, rankings }) {
 
         <button
           onClick={handleSubmit}
-          disabled={loading || !prompt.trim()}
+          disabled={loading || !prompt.trim() || challengeEnded}
           style={{
             marginTop: '10px',
             width: '100%',
             padding: '14px 24px',
-            background: loading ? 'var(--surface2)' : 'var(--accent)',
-            color: 'white',
+            background: challengeEnded ? 'var(--surface2)' : loading ? 'var(--surface2)' : 'var(--accent)',
+            color: challengeEnded ? 'var(--text-muted)' : 'white',
             border: 'none',
             borderRadius: 'var(--radius)',
             fontSize: '1.0625rem',
             fontWeight: 700,
-            cursor: loading ? 'not-allowed' : 'pointer',
+            cursor: (loading || challengeEnded) ? 'not-allowed' : 'pointer',
           }}
         >
-          {loading ? '생성 중...' : '🚀 제출'}
+          {challengeEnded ? '\u23F9 제출 마감됨' : loading ? '생성 중...' : '\uD83D\uDE80 제출'}
         </button>
       </div>
 

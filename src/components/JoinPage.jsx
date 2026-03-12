@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 
 const LS_TEACHER_CODE = 'vpython_teacher_code'
 
@@ -290,6 +290,20 @@ export default function JoinPage() {
         >
           {loading ? '참여 중...' : '🚀 참여하기'}
         </button>
+
+        <div style={{ textAlign: 'center', marginTop: '16px' }}>
+          <Link
+            to="/privacy"
+            style={{
+              color: 'var(--text-muted)',
+              fontSize: '0.75rem',
+              textDecoration: 'underline',
+              textUnderlineOffset: '2px',
+            }}
+          >
+            개인정보 처리방침
+          </Link>
+        </div>
       </div>
     </div>
   )

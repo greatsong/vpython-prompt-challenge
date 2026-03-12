@@ -12,6 +12,7 @@ const sections = [
   { id: 'howto', icon: '🚀', label: '수업 진행 방법' },
   { id: 'challenges', icon: '🎯', label: '챌린지 구성' },
   { id: 'tips', icon: '💡', label: '운영 팁' },
+  { id: 'privacy', icon: '🔒', label: '개인정보 보호' },
   { id: 'faq', icon: '💬', label: 'FAQ' },
 ]
 
@@ -72,6 +73,7 @@ export default function TeacherGuide() {
         {activeSection === 'howto' && <HowtoSection />}
         {activeSection === 'challenges' && <ChallengesSection />}
         {activeSection === 'tips' && <TipsSection />}
+        {activeSection === 'privacy' && <PrivacySection />}
         {activeSection === 'faq' && <FAQSection />}
       </main>
     </div>
@@ -638,20 +640,27 @@ function HowtoSection() {
       <StepCard num={3} color="#a78bfa" title="챌린지 진행">
         <ol style={listStyle}>
           <li>"수업 진행" 탭으로 이동합니다.</li>
-          <li>왼쪽 사이드바에서 챌린지를 선택하고 "시작" 버튼을 누릅니다.</li>
-          <li>학생 화면에 목표 3D 장면이 표시됩니다.</li>
+          <li>왼쪽 사이드바에서 챌린지를 <strong>클릭하여 선택</strong>합니다.</li>
+          <li><strong>"시작하기"</strong> 버튼을 누르면 학생 화면에 목표 3D 장면이 표시됩니다.</li>
           <li>학생들이 장면을 관찰하고 프롬프트를 작성하여 제출합니다.</li>
           <li>AI가 목표 장면과 비교하여 점수를 매깁니다. (100점 만점)</li>
           <li>학생은 여러 번 재시도할 수 있습니다.</li>
+          <li>충분한 시간이 지나면 <strong>"제출 마감"</strong> 버튼을 눌러 제출을 종료합니다.</li>
+          <li>마감 후 학생 화면의 제출 버튼이 비활성화됩니다.</li>
         </ol>
+        <InfoBox>
+          진행 중에는 다른 챌린지를 선택할 수 없습니다. 반드시 "제출 마감"을 누른 후 다음 챌린지를 선택하세요.
+          제출하지 않은 팀은 자동으로 0점 처리됩니다.
+        </InfoBox>
       </StepCard>
 
-      <StepCard num={4} color="#c084fc" title="비교 및 회고">
+      <StepCard num={4} color="#c084fc" title="결과 공개 및 회고">
         <ol style={listStyle}>
+          <li>마감 후 <strong>"결과 공개"</strong> 버튼으로 전체 순위를 학생 화면에 공개합니다.</li>
           <li>대시보드에서 팀 카드를 클릭하면 해당 팀의 프롬프트를 볼 수 있습니다.</li>
           <li>두 팀의 카드를 선택하면 프롬프트를 나란히 비교할 수 있습니다.</li>
-          <li>"결과 공개" 버튼으로 전체 순위를 공개합니다.</li>
-          <li>팀 채팅 모니터링으로 학생들의 대화를 실시간 확인합니다.</li>
+          <li><strong>"다음 챌린지 선택"</strong> 버튼을 누르면 다음 문제로 넘어갑니다.</li>
+          <li>완료된 챌린지는 목록에 체크 표시가 됩니다.</li>
         </ol>
       </StepCard>
 
@@ -662,7 +671,8 @@ function HowtoSection() {
         <FeatureCard icon="🔍" color="#3b82f6" title="프롬프트 비교" desc="두 팀의 프롬프트를 나란히 비교" />
         <FeatureCard icon="📊" color="#8b5cf6" title="CSV 내보내기" desc="팀별 점수와 프롬프트를 다운로드" />
         <FeatureCard icon="💡" color="#f97316" title="힌트 전송" desc="막히는 팀에게 실시간으로 힌트 전송" />
-        <FeatureCard icon="🏆" color="#ef4444" title="결과 공개" desc="라운드 종료 후 전체 순위 일괄 공개" />
+        <FeatureCard icon="⏹️" color="#ef4444" title="시작/마감 제어" desc="챌린지별 시작과 제출 마감을 명시적으로 제어" />
+        <FeatureCard icon="🏆" color="#a855f7" title="결과 공개" desc="마감 후 미제출 팀 0점 포함 순위 공개" />
       </div>
     </div>
   )
@@ -778,8 +788,109 @@ function TipsSection() {
           <TroubleshootItem icon="📱" problem="QR 스캔 불가" solution="칠판에 IP 직접 기재" />
           <TroubleshootItem icon="🔋" problem="학생 기기 없음" solution="팀 1대로 통합 진행" />
           <TroubleshootItem icon="👥" problem="15팀 초과" solution="자동으로 관람 모드 전환" />
+          <TroubleshootItem icon="🕐" problem="중간에 입장한 학생" solution="현재 진행 중인 챌린지가 자동 전달됩니다" />
+          <TroubleshootItem icon="📊" problem="미제출 팀 점수" solution="제출하지 않은 팀은 자동 0점 처리됩니다" />
         </div>
       </Card>
+    </div>
+  )
+}
+
+function PrivacySection() {
+  const privacyItems = [
+    {
+      q: '어떤 학생 정보가 수집되나요?',
+      a: '팀 구성 및 학습 추적을 위해 학번과 이름이 수집됩니다. 이 정보는 수업 운영과 평가 목적으로만 사용되며, 그 외의 개인정보는 수집하지 않습니다.',
+    },
+    {
+      q: 'AI(Claude)에 학생 정보가 전송되나요?',
+      a: 'AI API(Claude)에는 학생이 작성한 프롬프트와 생성된 코드만 전송됩니다. 학번, 이름 등 학생 식별 정보는 절대 AI에 전달되지 않습니다.',
+    },
+    {
+      q: '외부에서 무단 접근이 가능한가요?',
+      a: 'CORS 화이트리스트가 적용되어 있어, 허가된 도메인에서만 서버에 접근할 수 있습니다. 승인되지 않은 외부 사이트에서의 요청은 자동으로 차단됩니다.',
+    },
+    {
+      q: 'SQL 인젝션 등 보안 공격은 방어되나요?',
+      a: '모든 데이터베이스 쿼리에 매개변수화된 쿼리(Parameterized Query)를 사용하여 SQL 인젝션 공격을 방지합니다.',
+    },
+    {
+      q: '개인정보 처리방침을 확인할 수 있나요?',
+      a: '앱 하단의 링크 또는 /privacy 경로에서 개인정보 처리방침 전문을 확인할 수 있습니다. 수집 항목, 이용 목적, 보관 기간 등이 상세히 안내되어 있습니다.',
+    },
+    {
+      q: '수집된 데이터는 언제 삭제되나요?',
+      a: '수업 데이터는 학기 종료 시 전부 삭제됩니다. 학기 중에도 학생이 교사에게 요청하면 해당 학생의 데이터 열람 및 삭제가 가능합니다.',
+    },
+    {
+      q: '학생이 자신의 데이터를 확인하거나 삭제를 요청할 수 있나요?',
+      a: '네. 학생(또는 학부모)은 교사에게 데이터 열람 또는 삭제를 요청할 수 있습니다. 요청을 받으면 교사가 해당 데이터를 확인하거나 삭제 처리합니다.',
+    },
+  ]
+
+  return (
+    <div>
+      <SectionTitle>개인정보 보호</SectionTitle>
+      <p style={{ fontSize: '0.9375rem', lineHeight: 1.7, color: '#475569', marginBottom: '20px' }}>
+        본 서비스는 학생의 개인정보를 안전하게 보호하기 위해 다양한 기술적·관리적 조치를 적용하고 있습니다.
+        아래 항목을 통해 주요 보호 정책을 확인하세요.
+      </p>
+
+      <Card>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginBottom: '6px' }}>
+          <div style={{
+            padding: '16px',
+            background: '#f0fdf4',
+            borderRadius: '12px',
+            borderLeft: '3px solid #22c55e',
+          }}>
+            <div style={{ fontWeight: 700, fontSize: '0.875rem', color: '#16a34a', marginBottom: '6px' }}>수집 정보</div>
+            <div style={{ fontSize: '0.8125rem', color: '#475569', lineHeight: 1.6 }}>
+              학번, 이름 (팀 구성 및 학습 추적 목적)
+            </div>
+          </div>
+          <div style={{
+            padding: '16px',
+            background: '#eff6ff',
+            borderRadius: '12px',
+            borderLeft: '3px solid #3b82f6',
+          }}>
+            <div style={{ fontWeight: 700, fontSize: '0.875rem', color: '#2563eb', marginBottom: '6px' }}>AI 전송 범위</div>
+            <div style={{ fontSize: '0.8125rem', color: '#475569', lineHeight: 1.6 }}>
+              프롬프트와 코드만 전송 (학번·이름 미전송)
+            </div>
+          </div>
+          <div style={{
+            padding: '16px',
+            background: '#fef2f2',
+            borderRadius: '12px',
+            borderLeft: '3px solid #ef4444',
+          }}>
+            <div style={{ fontWeight: 700, fontSize: '0.875rem', color: '#dc2626', marginBottom: '6px' }}>접근 제한</div>
+            <div style={{ fontSize: '0.8125rem', color: '#475569', lineHeight: 1.6 }}>
+              CORS 화이트리스트로 허가된 도메인만 접근 허용
+            </div>
+          </div>
+          <div style={{
+            padding: '16px',
+            background: '#fffbeb',
+            borderRadius: '12px',
+            borderLeft: '3px solid #f59e0b',
+          }}>
+            <div style={{ fontWeight: 700, fontSize: '0.875rem', color: '#d97706', marginBottom: '6px' }}>데이터 보관</div>
+            <div style={{ fontSize: '0.8125rem', color: '#475569', lineHeight: 1.6 }}>
+              학기 종료 시 전체 삭제, 요청 시 즉시 삭제 가능
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      <SubTitle>자주 묻는 질문</SubTitle>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        {privacyItems.map((f, i) => (
+          <FAQItem key={i} q={f.q} a={f.a} />
+        ))}
+      </div>
     </div>
   )
 }
@@ -812,7 +923,15 @@ function FAQSection() {
     },
     {
       q: '한 세션에서 여러 챌린지를 진행할 수 있나요?',
-      a: '네. 사이드바에서 다른 챌린지를 선택하고 "시작" 버튼을 누르면 모든 팀에 새 챌린지가 전송됩니다.',
+      a: '네. 챌린지를 선택 → "시작하기" → "제출 마감" → "결과 공개" → "다음 챌린지 선택" 순서로 진행합니다. 완료된 챌린지는 체크 표시가 됩니다.',
+    },
+    {
+      q: '수업 중간에 학생이 들어오면 어떻게 되나요?',
+      a: '중간에 접속한 학생도 현재 진행 중인 챌린지가 자동으로 전달됩니다. 이전 챌린지는 미제출(0점)으로 처리됩니다.',
+    },
+    {
+      q: '문제를 제출하지 않은 팀은 어떻게 되나요?',
+      a: '미제출 팀은 순위에서 0점으로 표시됩니다. "1문제만 풀고 1등" 같은 상황은 발생하지 않습니다.',
     },
   ]
 

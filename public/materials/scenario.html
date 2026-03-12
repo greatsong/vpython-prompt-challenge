@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>수업 시나리오 — 말로 만드는 세계</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Pretendard', 'Apple SD Gothic Neo', system-ui, sans-serif; background: #f8fafc; color: #1e293b; line-height: 1.8; }
+  .container { max-width: 800px; margin: 0 auto; padding: 40px 24px; }
+  h1 { font-size: 1.75rem; font-weight: 800; margin-bottom: 8px; color: #6366f1; }
+  h2 { font-size: 1.25rem; font-weight: 700; margin: 32px 0 12px; padding-bottom: 8px; border-bottom: 2px solid #e2e8f0; }
+  h3 { font-size: 1.0625rem; font-weight: 600; margin: 20px 0 8px; color: #475569; }
+  .subtitle { font-size: 0.9375rem; color: #64748b; margin-bottom: 24px; }
+  .timeline { background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 24px; }
+  .timeline-row { display: flex; gap: 12px; padding: 8px 0; border-bottom: 1px solid #f1f5f9; }
+  .timeline-row:last-child { border: none; }
+  .timeline-time { min-width: 80px; font-weight: 700; color: #6366f1; font-size: 0.875rem; }
+  .timeline-label { font-size: 0.9375rem; }
+  .card { background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+  .script { background: #f8fafc; border-left: 3px solid #6366f1; padding: 12px 16px; margin: 10px 0; border-radius: 0 8px 8px 0; }
+  .script-speaker { font-size: 0.75rem; font-weight: 700; color: #6366f1; margin-bottom: 4px; }
+  .script-danger { border-left-color: #ef4444; }
+  .script-danger .script-speaker { color: #ef4444; }
+  .script-success { border-left-color: #22c55e; }
+  .script-success .script-speaker { color: #22c55e; }
+  .script-warning { border-left-color: #f59e0b; }
+  .script-warning .script-speaker { color: #f59e0b; }
+  blockquote { background: #eef2ff; border-left: 3px solid #8b5cf6; padding: 12px 16px; margin: 10px 0; border-radius: 0 8px 8px 0; font-size: 0.9375rem; color: #475569; }
+  .dialog { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 12px 16px; margin: 8px 0; font-family: monospace; font-size: 0.8125rem; white-space: pre-line; color: #166534; }
+  .warn { background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 12px 16px; margin: 8px 0; font-size: 0.875rem; color: #92400e; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+  th, td { padding: 8px 12px; text-align: left; border-bottom: 1px solid #e2e8f0; font-size: 0.875rem; }
+  th { background: #f8fafc; font-weight: 600; color: #475569; }
+  .print-btn { position: fixed; bottom: 24px; right: 24px; padding: 12px 24px; background: #6366f1; color: white; border: none; border-radius: 12px; font-size: 0.9375rem; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px rgba(99,102,241,0.3); }
+  @media print { .print-btn { display: none; } body { background: white; } }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>말로 만드는 세계</h1>
+  <p class="subtitle">수업 시나리오 — 100분 완전 대본 (교사 멘트, 예상 반응, 타이밍)</p>
+  <p class="subtitle">고등학교 1학년 정보 교과 · 2인 1팀 · 핵심 주제: 문제 정의(Problem Definition)</p>
+
+  <div class="timeline">
+    <div class="timeline-row"><span class="timeline-time">0~12분</span><span class="timeline-label"><strong>0부:</strong> 문제 정의란 무엇인가 (도입 + VPython 소개 + 실패 쇼)</span></div>
+    <div class="timeline-row"><span class="timeline-time">12~30분</span><span class="timeline-label"><strong>1부:</strong> 종이 게임 — 아날로그 문제 정의</span></div>
+    <div class="timeline-row"><span class="timeline-time">30~82분</span><span class="timeline-label"><strong>2부:</strong> VPython 글로 코딩 챌린지 (접속 + 챌린지 3개 + 성찰)</span></div>
+    <div class="timeline-row"><span class="timeline-time">82~100분</span><span class="timeline-label"><strong>3부:</strong> 전체 회고 — 문제 정의 × AI</span></div>
+  </div>
+
+  <h2>0부: 문제 정의란 무엇인가 (0~12분)</h2>
+
+  <h3>0-1. 수업의 의미 (0~5분)</h3>
+  <div class="script">
+    <div class="script-speaker">교사</div>
+    "여러분, 오늘부터 코딩을 배울 거예요.<br>
+    그런데 코딩을 시작하기 전에 딱 하나만 먼저 익혀야 할 게 있어요.<br>
+    이게 없으면 나중에 코딩을 잘 짜도 의미가 없어요.<br>
+    오늘 수업이 끝나면 그게 뭔지 알게 돼요."
+  </div>
+  <div class="script">
+    <div class="script-speaker">교사 (질문)</div>
+    "제가 질문 하나 할게요.<br>
+    친구한테 '맛있는 거 사와'라고 심부름을 시키면 어떻게 될까요?"
+  </div>
+  <blockquote>
+    예상 반응: "좋아하는 거 사오지 않을까요?" (60%) / "엉뚱한 거 사올 수도 있어요" (30%) / "물어볼 것 같은데요" (10%)
+  </blockquote>
+  <div class="script">
+    <div class="script-speaker">교사</div>
+    "누구 경험 있는 사람? 기대했던 거랑 달랐던 적?"<br>
+    [1~2명 경험 공유]<br><br>
+    "그게 <strong>문제 정의</strong>가 부족했기 때문이에요.<br>
+    내가 원하는 게 뭔지 정확하게 말하지 않으면<br>
+    사람도, 컴퓨터도, AI도 마음대로 채워버려요.<br>
+    오늘은 그 '정확하게 말하기'를 연습합니다."
+  </div>
+
+  <h3>0-2. VPython 소개 (5~8분)</h3>
+  <div class="script">
+    <div class="script-speaker">교사 (프로젝터에 VPython 3D 화면 띄우기)</div>
+    "앞으로 코딩은 이 도구로 배울 거예요.<br>
+    VPython이라고, 3D 물체를 코드로 만드는 거예요."<br><br>
+    [교사가 미리 준비한 VPython 데모 실행 — 3D 지구가 회전하는 장면 5초]<br><br>
+    "이걸 코드 몇 줄로 만든 거예요.<br>
+    앞으로 여러분이 이런 걸 직접 만들 거예요.<br>
+    근데 오늘은 코딩 안 해요."<br><br>
+    [학생들 예상 반응: "어?" "왜요?"]<br><br>
+    "오늘은 코딩 대신 <strong>글로 코딩</strong> 할 거예요.<br>
+    AI한테 말로 설명해서 VPython 코드를 만들게 할 거예요."
+  </div>
+
+  <h3>0-3. 실패 쇼 (8~12분)</h3>
+  <div class="script script-danger">
+    <div class="script-speaker">교사 (앱을 프로젝터에 띄우고, 아무 예고 없이 바로 입력)</div>
+    입력: <strong>"신호등 만들어줘"</strong><br><br>
+    [결과: 뭔가 나오긴 하지만 기대했던 신호등이 아님]<br><br>
+    "음... 이게 신호등인가요?"<br>
+    [학생 반응: 웃음, "아닌데요", "기둥이 없잖아요"]<br><br>
+    "AI가 신호등을 모르는 걸까요?<br>
+    아니면 제가 설명을 잘못한 걸까요?"<br><br>
+    [잠깐 기다리기 — 학생들이 생각하게 두기]<br><br>
+    "오늘 이 질문의 답을 찾아볼 거예요. 먼저 사람한테 해봅시다."
+  </div>
+  <blockquote>설계 의도: "누구 잘못인가?"라는 열린 질문으로 수업 전체의 탐구 동기 생성. 이 질문은 3부 회고에서 다시 회수된다.</blockquote>
+
+  <h2>1부: 종이 게임 — 아날로그 문제 정의 (12~30분)</h2>
+
+  <h3>활동 안내 (12~15분)</h3>
+  <div class="script">
+    <div class="script-speaker">교사</div>
+    "2인 1팀. 지금 앉은 자리에서 옆 사람이랑 팀이에요.<br>
+    한 명은 A, 한 명은 B.<br>
+    A는 화면을 보고, B는 등을 돌리고 표준 도형 카드를 준비합니다.<br>
+    A가 말로 설명하고, B가 카드로 장면을 만들어요.<br>
+    B는 <strong>질문할 수 있어요.</strong> 그게 포인트예요."
+  </div>
+  <div class="warn">그림 그리는 게 아니에요. 원 카드, 사각형 카드, 삼각형 카드로 모양을 배치하는 거예요. 그림 실력과 상관없습니다.</div>
+
+  <h3>Round 1 — 단순 장면 (15~23분 / 8분)</h3>
+  <p>목표 이미지: 검정 배경, 정가운데, 빨간 원</p>
+  <div class="dialog">잘 되는 팀:
+A: "검정 배경에 빨간 원이 정가운데 있어."
+B: "얼마나 커?"
+A: "전체 화면의 5분의 1 정도?"
+→ 결과: 비교적 근접</div>
+  <div class="dialog">안 되는 팀:
+A: "빨간 원."
+B: "어디에?"
+A: "중간에."
+→ 결과: 배치됐지만 크기와 위치가 제각각</div>
+  <div class="script">
+    <div class="script-speaker">교사 정리</div>
+    "크기, 위치, 기준 — 이 세 가지가 없으면 상대방이 마음대로 채워요.<br>
+    이게 문제 정의 실패예요."
+  </div>
+
+  <h3>Round 2 — 관계 추가 (23~30분 / 7분)</h3>
+  <p>목표 이미지: 파란 사각형 위에 초록 원이 올려져 있음 (A, B 역할 교체)</p>
+  <div class="dialog">핵심 대화:
+A: "파란 사각형 위에 초록 원이 있어."
+B: "원이 사각형 안에 있어요, 아니면 위에 얹혀 있어요?"</div>
+  <div class="script script-success">
+    <div class="script-speaker">교사 (즉시 포착)</div>
+    "방금 나온 질문 정말 좋아요.<br>
+    '안에' vs '위에' — 이 차이를 컴퓨터한테 설명하려면 어떻게 해야 할까요?<br>
+    그게 다음 활동이에요."
+  </div>
+
+  <h2>2부: VPython 글로 코딩 챌린지 (30~82분)</h2>
+
+  <h3>앱 접속 세팅 (30~35분)</h3>
+  <div class="script">
+    <div class="script-speaker">교사</div>
+    "이제 AI한테 직접 해봐요.<br>
+    QR코드 스캔하면 팀 화면이 열려요. 30초 안에 다 접속해봅시다."
+  </div>
+  <table>
+    <tr><th>상황</th><th>대응</th></tr>
+    <tr><td>학교 WiFi 차단</td><td>교사 핫스팟으로 전환</td></tr>
+    <tr><td>QR 스캔 불가</td><td>칠판에 IP 직접 기재</td></tr>
+    <tr><td>기기 없음</td><td>팀 1대로 통합 진행</td></tr>
+  </table>
+
+  <h3>챌린지 1: 분해 (35~52분 / 17분)</h3>
+  <div class="script">
+    <div class="script-speaker">교사 (문제 제시)</div>
+    "0부에서 '신호등 만들어줘' 했더니 뭔가 나왔죠.<br>
+    근데 이번 신호등은 조금 달라요. 잘 보세요."<br>
+    [목표 장면 공개]<br>
+    "이번엔 여러분이 설명해보세요. 8분. 여러 번 제출 가능해요."
+  </div>
+  <div class="dialog">잘 풀리는 팀:
+A: "기둥 하나, 공 세 개야. 4부품이네."
+B: "기둥부터 설명하자. 검은 원기둥, 세로로 세워져서..."
+A: "공 색 순서 중요해. 위에서부터 노랑, 빨강, 초록이야."
+→ 제출 → 원하는 신호등 완성</div>
+  <div class="dialog">막히는 팀:
+A: "신호등 만들어줘. 기둥 있고, 색깔 있고."
+B: "AI가 신호등 알잖아."
+→ 제출 → 빨강이 맨 위에 있는 일반 신호등 나옴
+A: "어? 노랑이 위에 있어야 하는데."
+B: "아 색 순서를 말해야 했구나!"</div>
+  <div class="script script-warning">
+    <div class="script-speaker">교사 (막히는 팀 조용히 방문)</div>
+    "AI가 신호등을 알아요. 그래서 뭔가 만들어줬죠.<br>
+    근데 우리가 원하는 신호등인가요?<br>
+    AI가 알고 있는 신호등과 우리 신호등이 어떻게 달라요?"
+  </div>
+  <div class="script script-success">
+    <div class="script-speaker">교사 정리</div>
+    "AI가 신호등을 몰랐나요? 아니에요. 알고 있었어요.<br>
+    근데 AI가 아는 신호등과 내가 원하는 신호등이 달랐어요.<br>
+    그 차이를 말로 표현해야 했는데 — 색의 순서, 위치, 크기.<br>
+    이걸 <strong>분해</strong>해서 하나하나 정의했을 때 비로소 원하는 결과가 나왔어요.<br>
+    분해(Decomposition) — 컴퓨팅 사고력의 첫 번째 요소입니다."
+  </div>
+
+  <h3>챌린지 2: 패턴인식 (52~68분 / 16분)</h3>
+  <div class="script">
+    <div class="script-speaker">교사 (문제 제시)</div>
+    "이번엔 조금 더 복잡해요. 자연물이에요.<br>
+    규칙이 있어요 — 꽃잎 6개가 <strong>원 모양으로</strong> 배치돼 있어요.<br>
+    어떻게 설명할 것 같아요? 8분."
+  </div>
+  <div class="dialog">팀 A: "꽃잎이 0도, 60도, 120도, 180도, 240도, 300도에 있어."
+팀 B: "그냥 꽃잎 6개를 빙 둘러서..."
+팀 C: "위 아래 좌 우 그리고... 대각선 두 개?"</div>
+  <div class="script script-success">
+    <div class="script-speaker">교사 정리</div>
+    "꽃잎 6개의 위치에는 <strong>패턴</strong>이 있어요. 60도씩 반복.<br>
+    이 패턴을 발견하면 설명이 짧아져요.<br>
+    패턴 인식(Pattern Recognition) — 컴퓨팅 사고력의 두 번째 요소."
+  </div>
+
+  <h3>챌린지 3: 추상화 (68~82분 / 14분)</h3>
+  <div class="script">
+    <div class="script-speaker">교사 (문제 제시)</div>
+    "마지막 챌린지예요. 이번엔 같은 게 여러 개 있어요.<br>
+    나무 5그루. 어떻게 설명할 것 같아요? 8분.<br>
+    힌트: 나무 하나를 먼저 정의하면 어떨까요?"
+  </div>
+  <div class="dialog">잘 풀리는 팀:
+A: "나무를 먼저 정의하자. 나무 = 갈색 원기둥 + 초록 구."
+B: "그걸 5번 반복하되 위치만 달라지는 거네."</div>
+  <div class="script script-warning">
+    <div class="script-speaker">교사 (긴 프롬프트 작성 팀에게)</div>
+    "그게 다 맞아요. 근데 나무가 100개라면?<br>
+    더 짧게 쓸 수 있는 방법이 있어요. '나무'가 뭔지 먼저 정의하면요."
+  </div>
+  <div class="script script-success">
+    <div class="script-speaker">교사 정리</div>
+    "'나무 = 갈색 기둥 + 초록 구'라고 먼저 정의하면<br>
+    나머지는 '나무를 x=-4, -2, 0, 2, 4에 배치'로 끝나요.<br>
+    추상화(Abstraction) — 복잡한 걸 단순하게 정의하는 것."
+  </div>
+
+  <h2>3부: 전체 회고 (82~100분)</h2>
+
+  <h3>3-1. 오늘 배운 것 회수 (82~88분)</h3>
+  <div class="script">
+    <div class="script-speaker">교사</div>
+    "0부에서 '신호등 만들어줘'가 실패했죠.<br>
+    이제 왜 실패했는지 알 것 같아요?"<br><br>
+    "AI 잘못이었나요, 제 잘못이었나요?"<br>
+    [학생들: "선생님 잘못이요" (웃음)]<br><br>
+    "맞아요. AI는 신호등을 알아요.<br>
+    근데 <strong>내가 원하는</strong> 신호등을 몰랐어요.<br>
+    문제를 정확히 정의하지 않았거든요."
+  </div>
+
+  <h3>3-2. AI 시대에 왜 문제 정의가 더 중요한가 (88~95분)</h3>
+  <div class="script">
+    <div class="script-speaker">교사</div>
+    "예전에는 코딩을 잘 짜는 게 실력이었어요.<br>
+    지금은 AI가 코드를 짤 수 있어요.<br>
+    그러면 이제 개발자는 필요 없을까요?"<br><br>
+    "AI한테 '더 좋은 코드 짜줘'라고 하면 어떻게 될까요?"<br><br>
+    "정확해요. AI는 강력해졌어요. 실행 능력이 올라갔어요.<br>
+    근데 <strong>무엇을 만들어야 하는지는 여전히 사람이 정해야 해요.</strong><br>
+    그게 문제 정의예요.<br><br>
+    AI 시대에 가장 중요한 역량이 뭔지 이제 알 것 같죠?"
+  </div>
+
+  <h3>3-3. 팀별 성찰 발표 (95~100분)</h3>
+  <div class="script">
+    <div class="script-speaker">교사</div>
+    "팀별로 딱 한 문장씩. 오늘 가장 놀라운 순간 또는 가장 어려웠던 순간."
+  </div>
+  <blockquote>
+    예상 반응:<br>
+    • "신호등을 AI가 알면서도 틀리게 만든 게 신기했어요"<br>
+    • "꽃잎 위치를 각도로 표현할 수 있다는 걸 처음 알았어요"<br>
+    • "나무를 먼저 정의하면 설명이 엄청 짧아지는 게 신기했어요"
+  </blockquote>
+  <div class="script">
+    <div class="script-speaker">교사 마무리</div>
+    "다음 시간엔 그 AI가 만든 코드를 직접 봐요.<br>
+    여러분이 프롬프트로 만든 것과 코드를 비교하면서,<br>
+    코드가 어떤 규칙으로 되어 있는지 탐정처럼 분석할 거예요.<br><br>
+    숙제는 없어요.<br>
+    대신 오늘 자기 팀 프롬프트 기억해두세요."
+  </div>
+
+  <h2>학습 결과 체크포인트</h2>
+  <table>
+    <tr><th>체크 항목</th><th>확인</th></tr>
+    <tr><td>모든 팀 최소 1회 프롬프트 제출</td><td>□</td></tr>
+    <tr><td>"신호등 만들어줘" 실패 이유를 학생 스스로 분석했는가</td><td>□</td></tr>
+    <tr><td>분해(신호등), 패턴(꽃), 추상화(숲) 개념이 언급됐는가</td><td>□</td></tr>
+    <tr><td>AI 잘못 vs 문제 정의 실패 구분이 이뤄졌는가</td><td>□</td></tr>
+    <tr><td>마무리 성찰이 개념적 반응이었는가</td><td>□</td></tr>
+  </table>
+</div>
+<button class="print-btn" onclick="window.print()">🖨️ 인쇄하기</button>
+</body>
+</html>

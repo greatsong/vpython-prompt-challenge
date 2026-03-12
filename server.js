@@ -27,14 +27,40 @@ db.pragma('foreign_keys = ON')
 const schema = fs.readFileSync(join(__dirname, 'db', 'schema.sql'), 'utf8')
 db.exec(schema)
 
+// ── CORS 화이트리스트 ────────────────────────────────────────────────────────
+const DEFAULT_ORIGINS = [
+  'https://vpython-prompt-challenge.fly.dev',
+  'http://localhost:3000',
+  'http://localhost:4008',
+  'http://localhost:4009',
+  'http://localhost:5173',
+]
+
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',').map(s => s.trim())
+  : DEFAULT_ORIGINS
+
+const corsOptions = {
+  origin(origin, callback) {
+    // origin이 없는 경우: 같은 서버에서 서빙하는 경우 또는 서버 간 요청
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true)
+    } else {
+      console.warn(`[CORS] 차단된 요청: ${origin}`)
+      callback(new Error('CORS 정책에 의해 차단됨'))
+    }
+  },
+  credentials: true,
+}
+
 // ── 앱 설정 ──────────────────────────────────────────────────────────────────
 const app = express()
 const httpServer = createServer(app)
 const io = new Server(httpServer, {
-  cors: { origin: '*' },
+  cors: corsOptions,
 })
 
-app.use(cors())
+app.use(cors(corsOptions))
 app.use(express.json())
 
 // db와 io를 라우터에서 사용할 수 있도록 주입
@@ -75,6 +101,9 @@ app.get('/api/network/ip', async (req, res) => {
   res.json({ ip })
 })
 
+// ── 세션별 활성 챌린지 추적 ──────────────────────────────────────────────────
+const activeChallenge = {} // { sessionId: { challengeId, timeLimit } }
+
 // ── Socket.io 이벤트 ─────────────────────────────────────────────────────────
 io.on('connection', (socket) => {
   console.log(`[Socket] 접속: ${socket.id}`)
@@ -91,11 +120,23 @@ io.on('connection', (socket) => {
     socket.join(`session:${sessionId}`)
     socket.join(`session:${sessionId}:team:${teamId}`)
     console.log(`[Socket] 팀 입장: session=${sessionId}, team=${teamId}`)
+
+    // 현재 진행 중인 챌린지가 있으면 즉시 전달
+    if (activeChallenge[sessionId]) {
+      socket.emit('challenge:started', activeChallenge[sessionId])
+    }
   })
 
   // 교사 → 전체: 챌린지 시작
   socket.on('challenge:start', ({ sessionId, challengeId, timeLimit }) => {
+    activeChallenge[sessionId] = { challengeId, timeLimit }
     io.to(`session:${sessionId}`).emit('challenge:started', { challengeId, timeLimit })
+  })
+
+  // 교사 → 전체: 챌린지 종료 (제출 마감)
+  socket.on('challenge:end', ({ sessionId }) => {
+    delete activeChallenge[sessionId]
+    io.to(`session:${sessionId}`).emit('challenge:ended', {})
   })
 
   // 교사 → 전체: 힌트 공개
@@ -105,40 +146,36 @@ io.on('connection', (socket) => {
 
   // 교사 → 전체: 결과 공개
   socket.on('challenge:reveal', ({ sessionId, challengeId }) => {
+    delete activeChallenge[sessionId]
     let rankings
 
     if (challengeId) {
-      // 현재 챌린지의 최고 점수만 (팀당 최고점)
+      // 현재 챌린지의 최고 점수 (미제출 팀은 0점)
       rankings = db
         .prepare(`
           SELECT t.name, t.color,
-                 MAX(a.score) AS score, a.prompt, a.generated_code
-          FROM attempts a
-          JOIN teams t ON t.id = a.team_id
-          WHERE t.session_id = ? AND a.challenge_id = ?
-          GROUP BY t.id
-          ORDER BY score DESC
-        `)
-        .all(sessionId, challengeId)
-    } else {
-      // challengeId 없으면 전체 attempts
-      rankings = db
-        .prepare(`
-          SELECT t.name, t.color,
-                 MAX(a.score) AS score, a.prompt, a.generated_code
-          FROM attempts a
-          JOIN teams t ON t.id = a.team_id
+                 COALESCE(MAX(a.score), 0) AS score,
+                 a.prompt, a.generated_code
+          FROM teams t
+          LEFT JOIN attempts a ON a.team_id = t.id AND a.challenge_id = ?
           WHERE t.session_id = ?
           GROUP BY t.id
           ORDER BY score DESC
         `)
-        .all(sessionId)
-    }
-
-    // attempts가 없으면 팀 목록으로 대체 (아직 제출 없는 경우)
-    if (rankings.length === 0) {
+        .all(challengeId, sessionId)
+    } else {
+      // 전체 챌린지 최고 점수 (미제출 팀은 0점)
       rankings = db
-        .prepare('SELECT name, color, 0 AS score FROM teams WHERE session_id = ?')
+        .prepare(`
+          SELECT t.name, t.color,
+                 COALESCE(MAX(a.score), 0) AS score,
+                 a.prompt, a.generated_code
+          FROM teams t
+          LEFT JOIN attempts a ON a.team_id = t.id
+          WHERE t.session_id = ?
+          GROUP BY t.id
+          ORDER BY score DESC
+        `)
         .all(sessionId)
     }
 
@@ -174,6 +211,22 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     console.log(`[Socket] 해제: ${socket.id}`)
+  })
+})
+
+// ── 개인정보 처리방침 (서버사이드 HTML) ──────────────────────────────────────
+app.get('/api/privacy', (req, res) => {
+  res.json({
+    title: '개인정보 처리방침',
+    lastUpdated: '2026-03-12',
+    content: {
+      purpose: '학생 식별, 팀 구성, 학습 진행 추적, AI 채점',
+      collected: '학번, 이름, 프롬프트, 생성 코드, CT 점수, 평가 결과',
+      retention: '해당 수업 종료 후 학기말 파기',
+      ai: 'Claude API를 통해 프롬프트와 코드가 처리됩니다. 학생의 이름·학번은 API로 전송되지 않으며, 서비스 운영을 위한 기술적 처리 목적으로만 사용됩니다.',
+      officer: '석리송 (당곡고등학교 정보과 교사)',
+      access: '열람·삭제 요청은 담당 교사에게 직접 요청하시기 바랍니다.',
+    },
   })
 })
 

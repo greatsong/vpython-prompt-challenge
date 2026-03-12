@@ -26,13 +26,20 @@ export default function ClassDashboard({ sessionId }) {
   const chatScrollRef = useRef(null)
 
   const loadTeams = async () => {
-    const res = await fetch(`/api/dashboard/${sessionId}`)
+    const cid = currentChallenge?.id
+    const url = cid
+      ? `/api/dashboard/${sessionId}?challengeId=${cid}`
+      : `/api/dashboard/${sessionId}`
+    const res = await fetch(url)
     const data = await res.json()
     setTeams(data.teams)
   }
 
   useEffect(() => {
     loadTeams()
+  }, [currentChallenge?.id])
+
+  useEffect(() => {
     const socket = createSocket()
     socketRef.current = socket
     socket.emit('teacher:join', { sessionId })

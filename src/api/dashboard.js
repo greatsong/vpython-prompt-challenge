@@ -5,26 +5,36 @@ const router = Router()
 // GET /api/dashboard/:sessionId — 실시간 팀 현황
 router.get('/dashboard/:sessionId', (req, res) => {
   const { sessionId } = req.params
+  const { challengeId } = req.query
 
   const teams = req.db
     .prepare('SELECT * FROM teams WHERE session_id = ?')
     .all(sessionId)
 
   const teamsWithScores = teams.map((team) => {
-    const latest = req.db
-      .prepare(
-        `SELECT score, evaluation, created_at
-         FROM attempts
-         WHERE team_id = ?
-         ORDER BY created_at DESC LIMIT 1`
-      )
-      .get(team.id)
+    // challengeId가 있으면 해당 챌린지 기준, 없으면 전체 최신
+    const latest = challengeId
+      ? req.db
+          .prepare(
+            `SELECT MAX(score) AS score, evaluation, created_at
+             FROM attempts
+             WHERE team_id = ? AND challenge_id = ?`
+          )
+          .get(team.id, challengeId)
+      : req.db
+          .prepare(
+            `SELECT score, evaluation, created_at
+             FROM attempts
+             WHERE team_id = ?
+             ORDER BY created_at DESC LIMIT 1`
+          )
+          .get(team.id)
 
     return {
       ...team,
       members: JSON.parse(team.members),
       latestScore: latest?.score ?? null,
-      hasSubmitted: !!latest,
+      hasSubmitted: !!(latest?.score !== null && latest?.score !== undefined),
       lastSubmitTime: latest?.created_at ?? null,
     }
   })
