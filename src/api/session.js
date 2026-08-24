@@ -261,21 +261,6 @@ router.get('/latest/teams', (req, res) => {
   })
 })
 
-// GET /api/session/:id/qr — 팀별 QR코드
-router.get('/:id/qr', requireTeacher, async (req, res) => {
-  const { teamId } = req.query
-  const team = req.db
-    .prepare('SELECT access_token FROM teams WHERE id = ? AND session_id = ?')
-    .get(teamId, req.params.id)
-  if (!team) return res.status(404).json({ error: '팀 없음' })
-
-  const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http'
-  const host = req.headers.host || 'localhost:4009'
-  const url = `${protocol}://${host}/team/${teamId}?token=${encodeURIComponent(team.access_token)}`
-  const qr = await QRCode.toDataURL(url)
-  res.json({ url, qr })
-})
-
 // GET /api/session/:id/join-qr — 참여 화면 QR코드
 // 학생이 휴대폰으로 스캔해 바로 들어오는 용도. 수업 코드를 쿼리에 담아
 // 칠판에 적은 코드를 옮겨 적다 틀리는 일을 없앤다.

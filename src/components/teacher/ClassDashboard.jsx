@@ -8,7 +8,7 @@ import { teacherFetch } from '../../utils/teacherAuth.js'
 
 export default function ClassDashboard({ sessionId }) {
   const { currentChallenge, setSubmissionProgress } = useSessionStore()
-  const { teams, setTeams, updateTeamScore } = useTeamStore()
+  const { teams, setTeams } = useTeamStore()
   const socketRef = useRef(null)
   const challengeIdRef = useRef(null)
   // 팀 정원 (서버의 MAX_TEAMS). 헤더에 "N / M팀" 형태로 함께 보여준다.

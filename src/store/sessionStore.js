@@ -14,7 +14,6 @@ const useSessionStore = create((set) => ({
   // 챌린지가 바뀌면 이전 라운드의 집계가 남지 않도록 함께 초기화한다
   setChallenge: (challenge) => set({ currentChallenge: challenge, submissionProgress: EMPTY_PROGRESS }),
   setSubmissionProgress: (progress) => set({ submissionProgress: progress }),
-  reset: () => set({ sessionId: null, currentChallenge: null, submissionProgress: EMPTY_PROGRESS }),
 }))
 
 export default useSessionStore
