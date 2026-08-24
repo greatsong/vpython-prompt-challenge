@@ -3,10 +3,30 @@ import useSessionStore from '../../store/sessionStore.js'
 import useTeamStore from '../../store/teamStore.js'
 import VPythonRunner from '../shared/VPythonRunner.jsx'
 import { generateCode, evaluatePrompt, saveAttempt } from '../../utils/claude.js'
-import { RUBRICS } from '../../data/rubrics.js'
 
 // sessionStorage 키
 const STORAGE_KEY = 'vpython_battle_state'
+
+// 자동 재생성 상한.
+// 코드가 토큰 한도로 잘린 경우엔 다시 만들어도 또 잘리므로, 무한 재시도를 막는다.
+const MAX_RENDER_RETRY = 2
+
+// 이전 코드와 오류 메시지를 함께 보내 "고쳐서 다시 만들기"가 통하는 오류 종류.
+// 네트워크·리소스 문제는 코드 탓이 아니라 repair를 보내도 의미가 없다.
+const REPAIRABLE_ERROR_KINDS = new Set(['syntax', 'runtime'])
+
+// 카테고리 표시 순서
+const SCORE_CATEGORIES = [
+  { key: 'structure', label: '구조·분해', icon: '🧩' },
+  { key: 'spatial', label: '공간 관계', icon: '📐' },
+  { key: 'proportion', label: '비율', icon: '⚖️' },
+  { key: 'shape', label: '도형 종류', icon: '🔷' },
+  { key: 'color', label: '색', icon: '🎨' },
+]
+
+// 서버가 category_max를 아직 안 내려줄 때 쓰는 5축 기본 배점.
+// 챌린지별 정답 정보가 아니라 평가 프레임워크의 일반 비중이라 노출돼도 힌트가 되지 않는다.
+const FALLBACK_CATEGORY_MAX = { structure: 25, spatial: 25, proportion: 20, shape: 10, color: 5 }
 
 // 라운드 키 — 같은 챌린지를 다시 시작해도 이전 라운드 내용이 남지 않도록
 // challengeId와 시작 시각(startedAt)을 함께 식별자로 쓴다.
@@ -53,7 +73,9 @@ export default function BattleMode({ team, socket, rankings, challengeEnded, rem
   const [loadingPhase, setLoadingPhase] = useState('') // 'generate' | 'evaluate' | ''
   const [latestEval, setLatestEval] = useState(null)
   const [hint, setHint] = useState('')
-  const [codeError, setCodeError] = useState(false)
+  // 3D 렌더링 실패 안내 — { kind, guide, exhausted }
+  // 채점 실패와는 별개다. 점수를 이미 받았다면 그대로 남겨둔다.
+  const [renderError, setRenderError] = useState(null)
   const [submitError, setSubmitError] = useState(null) // { message, phase } — 제출 실패 배너
   const retryRef = useRef(0) // 자동 재생성 횟수
   // 제출 도중 성공한 단계를 기억해 두는 버퍼.
@@ -78,7 +100,7 @@ export default function BattleMode({ team, socket, rankings, challengeEnded, rem
   // 라운드가 바뀌면(챌린지 변경 또는 같은 챌린지 재시작): 초기화 후 같은 라운드 상태만 복원
   useEffect(() => {
     retryRef.current = 0
-    setCodeError(false)
+    setRenderError(null)
     setHint('')
     setSubmitError(null)
     pendingSubmitRef.current = null
@@ -111,28 +133,72 @@ export default function BattleMode({ team, socket, rankings, challengeEnded, rem
     }
   }, [prompt, generatedCode, latestEval, currentRoundKey])
 
-  // VPythonRunner 에러 콜백 — 자동 재생성 (1회만)
-  const handleRenderError = useCallback(async (errorMsg) => {
-    if (!prompt.trim() || !currentChallenge || retryRef.current >= 1) {
-      setCodeError(true)
+  // VPythonRunner 에러 콜백 — 자동 재생성 (MAX_RENDER_RETRY회까지)
+  // info: { kind, message, guide } — kind는 syntax | runtime | resource | timeout
+  const handleRenderError = useCallback(async (info) => {
+    const kind = info?.kind || 'runtime'
+    const guide = info?.guide || '3D 화면을 만들지 못했어요.'
+
+    if (!prompt.trim() || !currentChallenge) {
+      setRenderError({ kind, guide, exhausted: false })
       return
     }
-    retryRef.current += 1
-    console.log('[BattleMode] 렌더링 에러 감지, 자동 재생성 시도:', errorMsg)
-    try {
-      const { code } = await generateCode(prompt, team.id)
-      setGeneratedCode(code)
-      setCodeError(false)
-    } catch {
-      setCodeError(true)
+
+    // 코드 자체가 문제인 오류(구문·실행)는 "무엇이 왜 실패했는지"를 함께 보내
+    // AI가 같은 실수를 반복하지 않게 한다. 네트워크 문제(resource/timeout)는
+    // 이전 코드가 원인이 아니므로 그냥 다시 만든다.
+    const repair = REPAIRABLE_ERROR_KINDS.has(kind) && generatedCode
+      ? { previousCode: generatedCode, errorMessage: info?.message || '' }
+      : null
+
+    if (retryRef.current >= MAX_RENDER_RETRY) {
+      // 더 만들어봐야 같은 이유로 또 실패한다 (예: 토큰 한도로 코드가 잘리는 경우)
+      setRenderError({
+        kind,
+        guide,
+        exhausted: true,
+        repairing: !!repair,
+      })
+      return
     }
-  }, [prompt, currentChallenge, team.id])
+
+    retryRef.current += 1
+    // 재생성 중임을 알린다. 성공하면 onReady 콜백이 이 안내를 거둔다.
+    setRenderError({ kind, guide, exhausted: false, repairing: !!repair })
+    console.log(
+      `[BattleMode] 렌더링 에러 감지(${kind}), ${repair ? '오류 정보를 실어' : ''} 자동 재생성 ${retryRef.current}/${MAX_RENDER_RETRY}:`,
+      info?.message
+    )
+    try {
+      const { code } = await generateCode(prompt, team.id, repair)
+      if (code === generatedCode) {
+        // 오류 정보까지 줬는데도 같은 코드가 왔다 — 다시 그려도 결과가 같으므로 멈춘다
+        // (토큰 한도로 잘리는 경우가 대표적이다)
+        retryRef.current = MAX_RENDER_RETRY
+        setRenderError({ kind, guide, exhausted: true, repairing: !!repair })
+        return
+      }
+      setGeneratedCode(code)
+    } catch (e) {
+      setRenderError({
+        kind,
+        guide: e?.message || guide,
+        exhausted: true,
+        repairing: !!repair,
+      })
+    }
+  }, [prompt, currentChallenge, team.id, generatedCode])
+
+  // 렌더링 성공 — 실패 안내를 거둔다
+  const handleRenderReady = useCallback(() => {
+    setRenderError(null)
+  }, [])
 
   const handleSubmit = async () => {
     if (!prompt.trim() || !currentChallenge) return
     setLoading(true)
     setSubmitError(null)
-    setCodeError(false)
+    setRenderError(null)
     retryRef.current = 0
 
     // 같은 프롬프트로 재시도하는 경우, 앞서 성공한 단계는 건너뛴다.
@@ -156,20 +222,32 @@ export default function BattleMode({ team, socket, rankings, challengeEnded, rem
         setGeneratedCode(pending.code)
       }
 
-      // 2. 평가 (루브릭 기반 — challengeId 전달)
+      // 2. 평가 (루브릭 기반 — challengeId만 전달)
+      // 정답 코드(targetCode)는 보내지 않는다. 서버가 challengeId로 직접 조회한다.
       phase = 'evaluate'
       if (!pending.evalResult) {
         setLoadingPhase('evaluate')
         pending.evalResult = await evaluatePrompt({
           prompt: submittedPrompt,
           generatedCode: pending.code,
-          targetCode: currentChallenge.code,
           challengeId: currentChallenge.id,
           sessionNumber: 1,
           teamId: team.id,
         })
       }
       const evalResult = pending.evalResult
+
+      // 채점 실패 (서버가 HTTP 200 + failed: true 로 알려준다)
+      // 가짜 점수를 보여주지 않고, 저장·리더보드 전송도 하지 않는다.
+      if (evalResult?.failed) {
+        pending.evalResult = null // 재시도 시 채점부터 다시
+        setLatestEval(null)
+        setSubmitError({ phase: 'grading-failed', message: '채점에 실패했어요. 다시 제출해주세요.' })
+        setLoading(false)
+        setLoadingPhase('')
+        return
+      }
+
       setLatestEval(evalResult)
 
       // 3. 저장
@@ -492,8 +570,42 @@ export default function BattleMode({ team, socket, rankings, challengeEnded, rem
           label="🤖 AI가 만든 장면"
           autoRun={!!generatedCode}
           onError={handleRenderError}
+          onReady={handleRenderReady}
         />
       </div>
+
+      {/* 3D 렌더링 실패 안내 — 채점 결과와는 별개다 */}
+      {renderError && (
+        <div style={{
+          padding: '12px 14px',
+          background: 'rgba(234,179,8,0.1)',
+          border: '1px solid var(--warning, #eab308)',
+          borderRadius: 'var(--radius)',
+        }}>
+          <div style={{ fontSize: '0.875rem', fontWeight: 700, marginBottom: '4px' }}>
+            🖼 3D 화면을 만들지 못했어요
+          </div>
+          <div style={{ fontSize: '0.8125rem', lineHeight: 1.6, color: 'var(--text-muted)' }}>
+            {renderError.guide}
+          </div>
+          {renderError.exhausted ? (
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '6px' }}>
+              {renderError.repairing
+                ? `오류를 알려주며 ${MAX_RENDER_RETRY}번 다시 만들어봤지만 실패했어요.`
+                : `${MAX_RENDER_RETRY}번 다시 만들어봤지만 실패했어요.`}
+              {' '}설명을 조금 더 간결하게 나눠서 다시 시도해보세요.
+              {latestEval ? ' 채점 결과와 점수는 아래에 그대로 남아 있어요.' : ''}
+            </div>
+          ) : (
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '6px' }}>
+              {renderError.repairing
+                ? '오류를 고쳐서 다시 만들고 있어요...'
+                : '자동으로 다시 만들고 있어요...'}
+              {' '}({retryRef.current}/{MAX_RENDER_RETRY})
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 프롬프트 입력 */}
       <div style={{
@@ -572,7 +684,7 @@ export default function BattleMode({ team, socket, rankings, challengeEnded, rem
             borderRadius: 'var(--radius)',
           }}>
             <div style={{ fontSize: '0.875rem', fontWeight: 700, marginBottom: '4px' }}>
-              \u26A0\uFE0F 제출에 실패했어요
+              {submitError.phase === 'grading-failed' ? '⚠️ 채점에 실패했어요' : '⚠️ 제출에 실패했어요'}
             </div>
             <div style={{ fontSize: '0.8125rem', lineHeight: 1.6, color: 'var(--text-muted)' }}>
               {submitError.message}
@@ -580,9 +692,11 @@ export default function BattleMode({ team, socket, rankings, challengeEnded, rem
             <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '6px' }}>
               {submitError.phase === 'save'
                 ? '채점까지는 끝났어요. 저장만 다시 시도하면 됩니다.'
-                : submitError.phase === 'evaluate'
-                  ? '3D 장면은 만들어졌어요. 채점부터 이어서 다시 시도합니다.'
-                  : '작성한 프롬프트는 그대로 남아 있어요.'}
+                : submitError.phase === 'grading-failed'
+                  ? '점수는 기록되지 않았어요. 같은 프롬프트로 다시 제출하면 채점부터 이어서 진행합니다.'
+                  : submitError.phase === 'evaluate'
+                    ? '3D 장면은 만들어졌어요. 채점부터 이어서 다시 시도합니다.'
+                    : '작성한 프롬프트는 그대로 남아 있어요.'}
             </div>
             <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
               <button
@@ -600,7 +714,7 @@ export default function BattleMode({ team, socket, rankings, challengeEnded, rem
                   cursor: challengeEnded ? 'not-allowed' : 'pointer',
                 }}
               >
-                \uD83D\uDD01 다시 시도
+                🔁 다시 시도
               </button>
               <button
                 onClick={() => setSubmitError(null)}
@@ -622,8 +736,8 @@ export default function BattleMode({ team, socket, rankings, challengeEnded, rem
         )}
       </div>
 
-      {/* 평가 결과 */}
-      {latestEval && (
+      {/* 평가 결과 — failed 응답은 점수가 없으므로 아예 그리지 않는다 */}
+      {latestEval && !latestEval.failed && typeof latestEval.score === 'number' && (
         <div style={{
           background: 'var(--surface)',
           border: `1px solid ${latestEval.score >= 80 ? 'var(--success)' : latestEval.score >= 60 ? 'var(--warning)' : 'var(--border)'}`,
@@ -642,33 +756,25 @@ export default function BattleMode({ team, socket, rankings, challengeEnded, rem
             점수는 여러분의 설명 품질을 평가합니다. AI가 만든 3D 결과와는 다를 수 있어요.
           </p>
 
-          {/* 카테고리별 점수 바 */}
+          {/* 카테고리별 점수 바 — 만점은 서버 응답(category_max)에서 받는다.
+              루브릭을 클라이언트에 두면 모범답안까지 번들에 실려 학생이 열람할 수 있다. */}
           {(() => {
-            const rubric = currentChallenge?.id ? RUBRICS[currentChallenge.id] : null
-            const catMax = {}
-            if (rubric) {
-              for (const e of rubric.elements) {
-                catMax[e.category] = (catMax[e.category] || 0) + e.weight
-              }
-            }
-            const cats = [
-              { key: 'structure', label: '구조·분해', icon: '🧩' },
-              { key: 'spatial', label: '공간 관계', icon: '📐' },
-              { key: 'proportion', label: '비율', icon: '⚖️' },
-              { key: 'shape', label: '도형 종류', icon: '🔷' },
-              { key: 'color', label: '색', icon: '🎨' },
-            ]
-            const visibleCats = cats.filter(({ key }) => {
-              const max = catMax[key] || 0
+            const serverMax = latestEval.category_max
+            const hasServerMax = serverMax && typeof serverMax === 'object'
+            // 서버가 아직 category_max를 안 주는 경우: 5축 기본 배점으로 대체하고,
+            // 점수가 있는 축만 보여준다 (없는 축을 만점만 채워 표시하면 오해를 준다).
+            const catMax = hasServerMax ? serverMax : FALLBACK_CATEGORY_MAX
+            const visibleCats = SCORE_CATEGORIES.filter(({ key }) => {
+              const max = Number(catMax[key]) || 0
               const score = latestEval.category_scores?.[key] ?? 0
-              return max > 0 || score > 0
+              return hasServerMax ? (max > 0 || score > 0) : score > 0
             })
             if (visibleCats.length === 0) return null
             return (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '12px' }}>
                 {visibleCats.map(({ key, label, icon }) => {
                   const score = latestEval.category_scores?.[key] ?? 0
-                  const max = catMax[key] || Math.max(score, 10)
+                  const max = Number(catMax[key]) || Math.max(score, 10)
                   const pct = Math.min(100, Math.round((score / max) * 100))
                   return (
                     <div key={key}>
@@ -702,7 +808,12 @@ export default function BattleMode({ team, socket, rankings, challengeEnded, rem
             }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem' }}>
                 <span style={{ color: 'var(--accent)', fontWeight: 600 }}>🧠 CT 사고력 보너스</span>
-                <span style={{ fontWeight: 700, color: 'var(--accent)' }}>+{latestEval.ct_score}점</span>
+                {/* 만점은 챌린지마다 다르므로 반드시 서버 응답(ct_max)을 쓴다 (하드코딩 금지) */}
+                <span style={{ fontWeight: 700, color: 'var(--accent)' }}>
+                  {Number(latestEval.ct_max) > 0
+                    ? `+${latestEval.ct_score} / ${latestEval.ct_max}점`
+                    : `+${latestEval.ct_score}점`}
+                </span>
               </div>
             </div>
           )}

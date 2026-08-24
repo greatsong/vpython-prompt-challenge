@@ -7,8 +7,8 @@
  */
 
 import assert from 'node:assert/strict'
-import { RUBRICS } from '../src/data/rubrics.js'
-import { BATTLE_CHALLENGES } from '../src/data/challenges-battle.js'
+import { RUBRICS } from '../src/server-data/rubrics.js'
+import { BATTLE_CHALLENGES } from '../src/server-data/challenges.js'
 import { normalizeEvaluation } from '../src/api/ai.js'
 import { createEvaluationProof, verifyEvaluationProof } from '../src/api/evaluationProof.js'
 

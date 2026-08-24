@@ -79,6 +79,17 @@ CREATE TABLE IF NOT EXISTS student_challenges (
   FOREIGN KEY (team_id) REFERENCES teams(id)
 );
 
+-- 채점 결과 캐시 (재현성 보장)
+-- 같은 챌린지에 같은 프롬프트가 다시 들어오면 AI를 다시 부르지 않고 저장된 평가를 그대로 준다.
+-- "같은 답 = 항상 같은 점수"가 보장되고, 다른 팀이 우연히 같은 문장을 써도 동점이 된다.
+-- cache_key = sha256(캐시버전 + challenge_id + 정규화된 프롬프트) — src/api/evaluationCache.js 참조.
+CREATE TABLE IF NOT EXISTS evaluation_cache (
+  cache_key       TEXT PRIMARY KEY,
+  challenge_id    TEXT,
+  evaluation_json TEXT NOT NULL,
+  created_at      INTEGER NOT NULL
+);
+
 -- 진행 중인 챌린지 상태 (서버 재시작 후 복구용)
 -- 서버가 죽어도 이 레코드로 activeChallenge 맵과 자동 종료 타이머를 되살린다.
 CREATE TABLE IF NOT EXISTS active_challenges (

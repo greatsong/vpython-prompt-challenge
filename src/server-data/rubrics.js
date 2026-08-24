@@ -1,19 +1,40 @@
 /**
- * 문제별 평가 루브릭 — 프롬프트 품질 기반 채점
+ * 문제별 평가 루브릭 — **서버 전용**
  *
- * 5축 평가 프레임워크 (2026-04-20 개편):
- *   structure  (25%) 구조·분해  — 부분 명명, 부분-전체 관계, 반복 규칙, 대칭·순서 같은 구조적 규칙
- *   spatial    (25%) 공간 관계  — 방향, 배치, 접합, 정면/측면, 수직/수평, 내부/외부
- *   proportion (20%) 비율       — 부분 간 상대적 크기, 길이, 두께, 납작함, 크기 감소/증가
- *   shape      (10%) 도형 종류  — 어떤 기본 도형(구/상자/원뿔 등)으로 표현할지
- *   color      (5%)  색         — 색상 언급 (유사어 관대)
- *   CT         (15%) 사고력 보너스 — 체계성·일관성·재현 가능성
+ * ⚠️ 이 파일은 절대 src/components/ 아래에서 import 하지 말 것.
+ *    anchors(만점 모범답안 프롬프트)와 elements[].desc(요소별 정답 힌트)가 들어 있어
+ *    클라이언트 번들에 포함되면 학생이 23개 문제의 모범답안을 그대로 읽을 수 있다.
+ *    클라이언트가 필요로 하는 카테고리 만점은 /api/evaluate 응답의
+ *    category_max / ct_max 필드로 내려보낸다.
  *
- * Lv1(단일 도형)은 structure 축이 없으므로 spatial/proportion/shape에 재분배.
+ * 5축 평가 프레임워크
+ *   structure  구조·분해  — 부분 명명, 부분-전체 관계, 반복 규칙, 대칭·순서 같은 구조적 규칙
+ *   spatial    공간 관계  — 방향, 배치, 접합, 정면/측면, 수직/수평, 내부/외부
+ *   proportion 비율       — 부분 간 상대적 크기, 길이, 두께, 납작함, 크기 감소/증가
+ *   shape      도형 종류  — 어떤 기본 도형(구/상자/원뿔 등)으로 표현할지
+ *   color      색         — 색상 언급 (유사어 관대)
+ *   CT         사고력 보너스 15점 — 규칙 기반 결정적 채점 (src/api/ctScore.js)
+ *
+ * 축별 배점은 문제마다 다르다. 고정 비율(25/25/20/10/5)이 아니라
+ * 그 장면에서 실제로 관찰 가능한 것에 맞춰 요소 배점을 배분한다.
+ *   Lv1(도형 1개)  — structure 축 없음. spatial/proportion/shape 중심
+ *   Lv2(분해)      — structure/spatial/proportion 고르게
+ *   Lv3(반복 패턴) — structure(패턴 규칙) 강화
+ *   Lv4~5(복합)    — 분해 + 패턴 + 비율 복합
+ * 요소 배점 합계는 항상 85점이고, 여기에 CT 15점을 더해 100점이 된다.
+ *
+ * 요소 작성 규칙 (2026-08 감사 반영)
+ *   1. **관측 가능한 것만 요소로 둔다.** 3D 화면을 보고 학생이 실제로 언급할 이유가
+ *      있는 특징이어야 한다. ("동일 평면 배치", "블록 크기가 모두 같음"처럼
+ *      당연해서 아무도 쓰지 않을 특징은 요소에서 뺐다.)
+ *   2. **TOP 앵커는 모든 카테고리를 커버해야 한다.** 공식 모범답안이 어떤 축에서
+ *      0점을 받으면 그 축의 요소나 앵커 둘 중 하나가 잘못된 것이다.
+ *   3. anchors[].score는 채점기의 보정 기준점이다. 실제 합산과 ±10 이상 벌어지면
+ *      요소 배점이나 앵커 문장을 다시 손봐야 한다.
  *
  * 구조:
  *   elements[]  — 필수 요소 (name, desc, weight, category)
- *   ct          — CT 사고력 보너스 (focus, maxPoints, criteria)
+ *   ct          — CT 사고력 보너스 (focus, maxPoints, criteria) — 규칙 기반 채점
  *   anchors[]   — 점수 앵커 (score, prompt) 3단계
  */
 
@@ -27,15 +48,18 @@ export const RUBRICS = {
       { name: '세워진 방향', desc: '세워져 있다/수직/정면을 향한다', weight: 20, category: 'spatial' },
       { name: '고리 평면', desc: '바닥에 눕혀져 있지 않다/앞뒤로 향한다', weight: 10, category: 'spatial' },
       { name: '중앙 위치', desc: '중앙에/가운데', weight: 10, category: 'spatial' },
-      { name: '두께 얇음', desc: '얇은/가느다란/두께 언급', weight: 13, category: 'proportion' },
-      { name: '크기 큼', desc: '크다/반지름이 큼/꽤 넓다', weight: 12, category: 'proportion' },
+      // 감사 지적: proportion 25점이 2요소뿐이라 부분점수가 {0,6,6.5,12,...}로 뚝뚝 끊겼다.
+      // 3요소로 쪼개 중간 점수가 촘촘하게 나오도록 했다.
+      { name: '두께 얇음', desc: '얇은/가느다란/두께 언급', weight: 8, category: 'proportion' },
+      { name: '반지름 큼', desc: '크다/반지름이 큼/꽤 넓다', weight: 9, category: 'proportion' },
+      { name: '두께 대비 크기', desc: '두께에 비해 지름이 훨씬 크다/가늘고 큰 고리라는 비 언급', weight: 8, category: 'proportion' },
       { name: '고리 도형', desc: '고리/링/도넛 형태 언급', weight: 15, category: 'shape' },
       { name: '청록색', desc: '청록/시안/하늘색 계열', weight: 5, category: 'color' },
     ],
     ct: { focus: '추상화', maxPoints: 15,
       criteria: '눈에 보이는 형태를 방향·크기 같은 속성 언어로 재구성하는 능력' },
     anchors: [
-      { score: 93, prompt: '중앙에 청록색 고리가 하나 있다. 바닥에 눕혀진 게 아니라 수직으로 세워져 있다. 두께는 얇고 크기는 꽤 크다.' },
+      { score: 93, prompt: '중앙에 청록색 고리가 하나 있다. 바닥에 눕혀진 게 아니라 수직으로 세워져 있다. 테두리 두께는 아주 얇고, 그에 비해 고리의 지름은 훨씬 크다.' },
       { score: 55, prompt: '파란 동그라미가 서 있다' },
       { score: 20, prompt: '포탈' },
     ],
@@ -53,7 +77,7 @@ export const RUBRICS = {
     ct: { focus: '추상화', maxPoints: 15,
       criteria: '구와 타원체의 차이를 비율 언어로 정확히 서술하는 능력' },
     anchors: [
-      { score: 93, prompt: '중앙에 초록색 타원체가 있다. 완전한 구가 아니라 가로 방향으로 더 길고 약간 납작한 형태이다.' },
+      { score: 93, prompt: '중앙에 초록색 타원체가 가로로 누워 있다. 완전한 구가 아니라 가로 방향으로 더 길고 위아래로는 약간 납작한 형태이다.' },
       { score: 55, prompt: '초록색 공이 있다' },
       { score: 20, prompt: '수박' },
     ],
@@ -72,7 +96,8 @@ export const RUBRICS = {
     ct: { focus: '추상화', maxPoints: 15,
       criteria: '방향을 두 축(시작-끝)의 공간 관계로 분해하여 서술하는 능력' },
     anchors: [
-      { score: 93, prompt: '자홍색 화살표가 하나 있다. 왼쪽 아래에서 오른쪽 위를 향해 대각선으로 비스듬히 뻗어 있다.' },
+      // 감사 지적: 기존 TOP 앵커에 길이 언급이 없어 proportion 0/10이었다. "길게"를 넣어 보강.
+      { score: 93, prompt: '자홍색 화살표가 하나 있다. 왼쪽 아래에서 오른쪽 위를 향해 대각선으로 길게 뻗어 있고, 뾰족한 화살촉이 오른쪽 위 끝에 있다.' },
       { score: 55, prompt: '분홍 화살표가 있다' },
       { score: 20, prompt: '화살표' },
     ],
@@ -113,7 +138,7 @@ export const RUBRICS = {
       { name: '아래 원뿔 위 향함', desc: '아래 원뿔이 위를 향함/넓은 면이 아래', weight: 10, category: 'spatial' },
       { name: '구의 중앙 위치', desc: '구가 가운데에/맞닿는 지점에', weight: 5, category: 'spatial' },
       { name: '구 작음', desc: '작은/조그만 구', weight: 10, category: 'proportion' },
-      { name: '원뿔 크기 관계', desc: '두 원뿔이 비슷한 크기/대칭', weight: 10, category: 'proportion' },
+      { name: '원뿔 크기 관계', desc: '두 원뿔이 비슷한 크기/위아래 대칭', weight: 10, category: 'proportion' },
       { name: '원뿔·구 구분', desc: '원뿔과 구를 명확히 구분', weight: 10, category: 'shape' },
       { name: '원뿔 청록', desc: '청록/시안', weight: 3, category: 'color' },
       { name: '구 노란색', desc: '노란/노랑', weight: 2, category: 'color' },
@@ -121,7 +146,7 @@ export const RUBRICS = {
     ct: { focus: '분해', maxPoints: 15,
       criteria: '모래시계를 원뿔+구로 분해하고, 원뿔의 방향성을 체계적으로 서술하는 능력' },
     anchors: [
-      { score: 92, prompt: '청록색 원뿔 두 개가 있다. 위쪽 원뿔은 넓은 부분이 위에 있고 아래로 좁아진다. 아래쪽 원뿔은 넓은 부분이 아래에 있고 위로 좁아진다. 두 꼭짓점이 가운데서 만난다. 만나는 지점에 작은 노란색 구가 있다.' },
+      { score: 92, prompt: '크기가 비슷한 청록색 원뿔 두 개가 위아래로 대칭을 이룬다. 위쪽 원뿔은 넓은 부분이 위에 있고 아래로 좁아진다. 아래쪽 원뿔은 넓은 부분이 아래에 있고 위로 좁아진다. 두 꼭짓점이 가운데서 만난다. 만나는 지점에 작은 노란색 구가 있다.' },
       { score: 55, prompt: '원뿔 두 개가 위아래로 있고 가운데 공이 있다' },
       { score: 20, prompt: '모래시계' },
     ],
@@ -164,7 +189,7 @@ export const RUBRICS = {
     ct: { focus: '분해', maxPoints: 15,
       criteria: '로켓을 세 부분으로 분해하고 각 부분의 도형·방향·위치를 체계적으로 서술하는 능력' },
     anchors: [
-      { score: 92, prompt: '파란색 원기둥이 세로로 서 있다. 그 위에 빨간색 원뿔이 위를 향하고 있다. 원기둥 아래에는 주황색 원뿔이 아래를 향한다.' },
+      { score: 92, prompt: '길쭉한 파란색 원기둥이 세로로 서 있다. 그 위에 원기둥보다 작은 빨간색 원뿔이 뾰족한 끝을 위로 하고 얹혀 있다. 원기둥 아래에는 주황색 원뿔이 뾰족한 끝을 아래로 향한다.' },
       { score: 55, prompt: '파란 기둥 위에 빨간 뿔, 아래에 주황 뿔' },
       { score: 20, prompt: '로켓' },
     ],
@@ -212,7 +237,9 @@ export const RUBRICS = {
       criteria: '계단의 반복 규칙(한 칸씩 위+오른쪽)을 패턴으로 인식하고 서술하는 능력' },
     anchors: [
       { score: 92, prompt: '빨간색 납작한 상자 6개가 계단처럼 배치되어 있다. 왼쪽 아래에서 시작해서 오른쪽 위로 한 칸씩 올라간다.' },
-      { score: 55, prompt: '빨간 상자 여러 개가 계단 모양이다' },
+      // 감사 지적: 기존 MID 앵커('빨간 상자 여러 개가 계단 모양이다')는 실제 배점상 25점짜리였다.
+      // 50점대를 대표하도록 방향 서술을 넣어 현실화했다.
+      { score: 52, prompt: '빨간 상자 여러 개가 왼쪽 아래에서 오른쪽 위로 계단처럼 이어져 있다.' },
       { score: 20, prompt: '계단' },
     ],
   },
@@ -232,7 +259,7 @@ export const RUBRICS = {
     ct: { focus: '패턴+알고리즘', maxPoints: 15,
       criteria: '원형 배치의 반복 규칙(개수, 등간격, 원 반지름)을 패턴으로 인식하고 서술하는 능력' },
     anchors: [
-      { score: 92, prompt: '노란색 가느다란 원기둥 12개가 원을 그리면서 균등한 간격으로 세워져 있다.' },
+      { score: 92, prompt: '노란색 가느다란 원기둥 12개가 원을 그리면서 균등한 간격으로 세워져 있다. 각 기둥은 원의 중심을 둘러싸도록 배치되어 있다.' },
       { score: 55, prompt: '노란 기둥들이 둥글게 서 있다' },
       { score: 20, prompt: '울타리' },
     ],
@@ -245,14 +272,16 @@ export const RUBRICS = {
       { name: '층별 색상 변화', desc: '층마다 다른 색', weight: 10, category: 'structure' },
       { name: '가운데 정렬', desc: '가운데 정렬/위로 갈수록 안쪽', weight: 10, category: 'spatial' },
       { name: '위로 쌓임', desc: '아래→위로 쌓임', weight: 5, category: 'spatial' },
-      { name: '각 블록 비슷한 크기', desc: '블록 크기 일정', weight: 5, category: 'proportion' },
+      // 감사 지적: 기존 '각 블록 비슷한 크기'는 관측할 이유가 없는 요소라 아무도 쓰지 않았다
+      // (TOP 앵커조차 proportion 0/5). 실제로 눈에 보이는 "위층이 더 좁다"로 교체.
+      { name: '위층이 더 좁음', desc: '위로 갈수록 층의 폭이 줄어든다/위층이 아래층보다 좁다', weight: 5, category: 'proportion' },
       { name: '정육면체 도형', desc: '정육면체/상자/블록', weight: 10, category: 'shape' },
       { name: '주황·청록·자홍', desc: '세 색 모두 언급', weight: 15, category: 'color' },
     ],
     ct: { focus: '패턴+분해', maxPoints: 15,
       criteria: '피라미드의 층별 규칙(개수 감소, 색상 변화, 정렬)을 패턴으로 인식하고 서술하는 능력' },
     anchors: [
-      { score: 92, prompt: '정육면체 블록이 피라미드처럼 쌓여 있다. 맨 아래층에 주황색 3개, 가운데층에 청록색 2개, 꼭대기에 자홍색 1개. 위로 갈수록 하나씩 줄어들고 가운데 정렬이다.' },
+      { score: 92, prompt: '정육면체 블록이 피라미드처럼 쌓여 있다. 맨 아래층에 주황색 3개, 가운데층에 청록색 2개, 꼭대기에 자홍색 1개. 위로 올라갈수록 층의 폭이 하나씩 좁아지고 가운데 정렬이다.' },
       { score: 55, prompt: '색깔 다른 블록이 피라미드처럼 쌓여 있다' },
       { score: 20, prompt: '피라미드' },
     ],
@@ -263,7 +292,9 @@ export const RUBRICS = {
       { name: '4x4 격자 규칙', desc: '4x4/4줄 4칸/16개 격자', weight: 15, category: 'structure' },
       { name: '번갈아 색상 규칙', desc: '흰-검이 한 칸씩 교대로', weight: 20, category: 'structure' },
       { name: '다음 줄 반대 시작', desc: '다음 줄은 반대 색으로 시작', weight: 10, category: 'structure' },
-      { name: '동일 평면 배치', desc: '평평하게/바닥 같은 평면', weight: 8, category: 'spatial' },
+      // 감사 지적: 기존 '동일 평면 배치'는 체스판을 보고 "평평한 평면 위에 있다"라고 쓸 이유가
+      // 없는 요소였다(TOP 앵커조차 spatial 0/8). 관측 가능한 "줄·칸 정렬"로 교체.
+      { name: '줄·칸 정렬', desc: '가로 세로 줄이 딱 맞게 나란히 정렬/빈틈없이 붙어 있다', weight: 8, category: 'spatial' },
       { name: '납작한 칸', desc: '납작한/얇은 칸', weight: 7, category: 'proportion' },
       { name: '상자 도형', desc: '정사각형/상자', weight: 10, category: 'shape' },
       { name: '16칸 명시', desc: '16개/총 칸 수', weight: 5, category: 'shape' },
@@ -272,7 +303,7 @@ export const RUBRICS = {
     ct: { focus: '알고리즘+패턴', maxPoints: 15,
       criteria: '체스판의 색상 교차 규칙을 정확히 인식하고, 격자 크기와 배치 규칙을 알고리즘적으로 서술하는 능력' },
     anchors: [
-      { score: 92, prompt: '납작한 정사각형 상자가 4줄 4칸, 총 16개 격자로 배열되어 있다. 같은 줄에서 흰색과 검은색이 한 칸씩 번갈아 나오고, 다음 줄은 반대 색으로 시작한다.' },
+      { score: 92, prompt: '납작한 정사각형 상자가 4줄 4칸, 총 16개 격자로 줄과 칸을 딱 맞춰 빈틈없이 배열되어 있다. 같은 줄에서 흰색과 검은색이 한 칸씩 번갈아 나오고, 다음 줄은 반대 색으로 시작한다.' },
       { score: 55, prompt: '흰색 검은색 상자가 4x4로 놓여 있다' },
       { score: 20, prompt: '체스판' },
     ],
@@ -283,15 +314,18 @@ export const RUBRICS = {
       { name: '6x6 격자', desc: '6x6/6행 6열/36개', weight: 12, category: 'structure' },
       { name: '행별 단일 색 규칙', desc: '한 행은 한 가지 색/행마다 색이 다름', weight: 15, category: 'structure' },
       { name: '무지개 순서', desc: '빨-주-노-초-파-보 순서 규칙', weight: 13, category: 'structure' },
-      { name: '격자 정렬', desc: '줄 맞춰/정렬된 격자', weight: 10, category: 'spatial' },
-      { name: '구 크기 균일', desc: '크기가 균일한/같은 크기', weight: 5, category: 'proportion' },
+      // 감사 지적: color 20점은 "색 이름만 나열해도 22점"이 나오게 만들었다.
+      // color를 8점으로 낮추고 남는 배점을 spatial/proportion으로 옮겼다.
+      { name: '격자 정렬', desc: '줄 맞춰/행과 열이 정렬된 격자', weight: 12, category: 'spatial' },
+      { name: '아래→위 행 순서', desc: '아래 행부터 위 행으로 색이 바뀌는 순서', weight: 5, category: 'spatial' },
+      { name: '구 크기 균일', desc: '모든 구가 같은 크기다/크기 차이가 없다', weight: 10, category: 'proportion' },
       { name: '구 도형', desc: '구/공/구슬', weight: 10, category: 'shape' },
-      { name: '6색 무지개', desc: '빨강·주황·노랑·초록·파랑·자홍 다수 언급', weight: 20, category: 'color' },
+      { name: '6색 무지개', desc: '빨강·주황·노랑·초록·파랑·자홍 다수 언급', weight: 8, category: 'color' },
     ],
     ct: { focus: '패턴+알고리즘', maxPoints: 15,
       criteria: '격자 배치 규칙과 행별 색상 순서 패턴을 정확히 인식하고 서술하는 능력' },
     anchors: [
-      { score: 92, prompt: '구 36개가 6행 6열 격자로 배열되어 있다. 각 행이 아래부터 빨강, 주황, 노랑, 초록, 파랑, 자홍 순서로 무지개 색이다.' },
+      { score: 92, prompt: '크기가 모두 같은 구 36개가 6행 6열 격자로 줄을 맞춰 배열되어 있다. 각 행이 아래부터 위로 빨강, 주황, 노랑, 초록, 파랑, 자홍 순서로 무지개 색이다.' },
       { score: 55, prompt: '여러 색 구가 격자로 놓여 있다' },
       { score: 20, prompt: '구슬 커튼' },
     ],
@@ -311,7 +345,7 @@ export const RUBRICS = {
     ct: { focus: '패턴+알고리즘', maxPoints: 15,
       criteria: '나선 경로의 본질(회전+상승 결합)을 인식하고, 개별 나열이 아닌 전체 패턴으로 서술하는 능력' },
     anchors: [
-      { score: 90, prompt: '청록색 작은 구 30개가 나선형으로 배치되어 있다. 아래에서 위로 올라가면서 빙글빙글 회전하는 경로를 따른다.' },
+      { score: 90, prompt: '청록색 작은 구 30개가 나선형으로 배치되어 있다. 아래에서 위로 올라가면서 원을 그리듯 빙글빙글 회전하는 경로를 따른다.' },
       { score: 55, prompt: '파란 공들이 빙글빙글 올라간다' },
       { score: 20, prompt: '나선 탑' },
     ],
@@ -331,7 +365,7 @@ export const RUBRICS = {
     ct: { focus: '패턴+알고리즘', maxPoints: 15,
       criteria: '3D 피라미드의 층별 감소 규칙(4x4→3x3→2x2→1)을 인식하고, 입체 구조를 서술하는 능력' },
     anchors: [
-      { score: 90, prompt: '주황색 정육면체 블록이 피라미드 형태로 쌓여 있다. 맨 아래층은 4x4(16개), 그 위에 3x3(9개), 그 위에 2x2(4개), 꼭대기에 1개. 총 4층이다.' },
+      { score: 90, prompt: '주황색 정육면체 블록이 가로세로 모두 있는 입체 피라미드로 쌓여 있다. 맨 아래층은 가로 4개 세로 4개, 그 위층은 가로 3개 세로 3개, 그 위는 2개씩, 꼭대기는 1개다. 총 4층이고 위로 갈수록 중심 쪽으로 좁아진다.' },
       { score: 55, prompt: '주황 블록이 피라미드처럼 쌓여 있다' },
       { score: 20, prompt: '3D 피라미드' },
     ],
@@ -377,7 +411,7 @@ export const RUBRICS = {
     ct: { focus: '분해+추상화', maxPoints: 15,
       criteria: '신호등을 본체, 불, 기둥으로 분해하고 내부/외부 공간 관계를 서술하는 능력' },
     anchors: [
-      { score: 92, prompt: '검은 세로 직사각형 상자가 본체이다. 본체 앞면에 위에서부터 빨간, 노란, 초록 구가 세로로 나란히 있다. 본체 아래에 회색 원기둥이 기둥으로 서 있다.' },
+      { score: 92, prompt: '세로로 길쭉한 검은 직사각형 상자가 본체이다. 본체 앞면에 본체보다 훨씬 작은 빨간, 노란, 초록 구가 위에서부터 세로로 나란히 박혀 있다. 본체 아래에 회색 원기둥이 기둥으로 서 있다.' },
       { score: 50, prompt: '검은 상자 안에 빨강 노랑 초록 불이 있다' },
       { score: 20, prompt: '신호등' },
     ],
@@ -398,7 +432,7 @@ export const RUBRICS = {
     ct: { focus: '분해+추상화', maxPoints: 15,
       criteria: '유사하지만 다른 5개 건물의 차이점(높이, 너비, 색상)을 비교하며 체계적으로 서술하는 능력' },
     anchors: [
-      { score: 92, prompt: '상자 5개가 옆으로 나란히 서 있다. 왼쪽부터: 파란색 좁고 중간 높이, 청록색 좁고 높은, 회색 넓고 중간, 흰색 가장 좁고 가장 높은, 주황색 넓고 가장 낮은 건물이다.' },
+      { score: 92, prompt: '상자 5개가 바닥에 발을 맞춰 옆으로 나란히 서 있다. 왼쪽부터: 파란색 좁고 중간 높이, 청록색 좁고 높은, 회색 넓고 중간, 흰색 가장 좁고 가장 높은, 주황색 넓고 가장 낮은 건물이다. 다섯 개 모두 높이와 너비가 서로 다르다.' },
       { score: 50, prompt: '높이가 다른 상자 여러 개가 나란히 있다' },
       { score: 20, prompt: '건물들' },
     ],
@@ -419,7 +453,7 @@ export const RUBRICS = {
     ct: { focus: '분해+추상화', maxPoints: 15,
       criteria: '저울을 받침+막대+추로 분해하고, 비대칭 구조의 공간 관계를 서술하는 능력' },
     anchors: [
-      { score: 92, prompt: '가운데에 노란 원뿔이 꼭짓점을 위로 하고 서 있다. 그 위에 회색 원기둥이 수평으로 걸쳐 있다. 막대 왼쪽 끝에 큰 빨간 구, 오른쪽 끝에 작은 파란 구가 달려 있다.' },
+      { score: 92, prompt: '가운데에 노란 원뿔이 꼭짓점을 위로 하고 서 있다. 그 위에 원뿔보다 훨씬 긴 회색 원기둥이 수평으로 걸쳐 있다. 막대 왼쪽 끝에 큰 빨간 구, 오른쪽 끝에 작은 파란 구가 달려 있어 좌우가 비대칭이다.' },
       { score: 50, prompt: '삼각형 위에 막대가 있고 양쪽에 공이 있다' },
       { score: 20, prompt: '저울' },
     ],
@@ -447,7 +481,9 @@ export const RUBRICS = {
       criteria: '꽃을 줄기·꽃잎·꽃술로 분해하고, 꽃잎의 원형 배치 패턴을 인식하여 서술하는 능력' },
     anchors: [
       { score: 92, prompt: '초록색 가느다란 원기둥이 줄기로 세로로 서 있다. 줄기 꼭대기에 자홍색 납작한 타원체 5개가 원형으로 배치되어 꽃잎을 이룬다. 꽃잎 중심에 노란색 작은 구가 꽃술이다.' },
-      { score: 50, prompt: '초록 줄기 위에 분홍 꽃잎과 노란 가운데' },
+      // 감사 지적: 기존 MID 앵커('초록 줄기 위에 분홍 꽃잎과 노란 가운데')는 실제 배점상 24점짜리였다.
+      // 50점대를 대표하도록 방향·배치 서술을 넣어 현실화했다.
+      { score: 50, prompt: '초록 줄기가 세로로 서 있고 그 위에 분홍 꽃잎이 둥글게 퍼져 있다. 꽃잎 가운데는 노랗다.' },
       { score: 20, prompt: '꽃' },
     ],
   },
@@ -468,7 +504,7 @@ export const RUBRICS = {
     ct: { focus: '분해+추상화', maxPoints: 15,
       criteria: '얼굴을 머리/눈/입/안테나로 분해하고 좌우 대칭 구조와 앞뒤 관계를 서술하는 능력' },
     anchors: [
-      { score: 92, prompt: '큰 회색 상자가 머리이다. 머리 앞면 위쪽에 노란 구 2개가 좌우로 눈이다. 눈 아래에 빨간 납작한 작은 상자가 입이다. 머리 위 양쪽에 회색 원기둥 2개가 안테나로 올라가고, 각 끝에 빨간 작은 구가 달려있다.' },
+      { score: 92, prompt: '가장 큰 회색 상자가 머리이다. 머리 앞면 위쪽에 머리보다 훨씬 작은 노란 구 2개가 좌우 대칭으로 눈이다. 눈 아래에 빨간 납작한 작은 상자가 입이다. 머리 위 양쪽에 회색 원기둥 2개가 안테나로 올라가고, 각 끝에 빨간 작은 구가 달려있다.' },
       { score: 50, prompt: '네모 머리에 눈 2개, 안테나가 있다' },
       { score: 20, prompt: '로봇 얼굴' },
     ],
@@ -488,7 +524,7 @@ export const RUBRICS = {
     ct: { focus: '분해+추상화', maxPoints: 15,
       criteria: '분자 모형의 중심-결합-말단 구조를 분해하고, 3차원 방향성을 서술하는 능력' },
     anchors: [
-      { score: 92, prompt: '큰 빨간 구가 중심에 있다. 중심에서 세 방향으로 가느다란 회색 원기둥이 결합봉처럼 뻗어 있다. 하나는 오른쪽 위, 하나는 왼쪽 위, 하나는 아래 뒤쪽을 향한다. 각 봉 끝에 파란색 작은 구가 달려 있다.' },
+      { score: 92, prompt: '큰 빨간 구가 중심에 있다. 중심에서 세 방향으로 가느다란 회색 원기둥이 결합봉처럼 뻗어 있다. 하나는 오른쪽 위, 하나는 왼쪽 위, 하나는 아래 뒤쪽을 향한다. 각 봉 끝에 중심보다 작은 파란색 구가 달려 있다.' },
       { score: 50, prompt: '큰 빨간 공에서 막대가 여러 방향으로 나와서 끝에 작은 공이 있다' },
       { score: 20, prompt: '분자 모형' },
     ],
@@ -509,7 +545,7 @@ export const RUBRICS = {
     ct: { focus: '분해+패턴', maxPoints: 15,
       criteria: '회전목마를 중심기둥/지붕/좌석으로 분해하고, 좌석의 원형 배치 패턴을 인식하여 서술하는 능력' },
     anchors: [
-      { score: 92, prompt: '가운데에 노란 원기둥이 세로로 서 있다. 원기둥 위에 빨간 원뿔이 지붕처럼 얹혀 있다. 기둥 주위에 파란 작은 구 8개가 원형으로 같은 간격으로 배치되어 좌석이다.' },
+      { score: 92, prompt: '가운데에 노란 원기둥이 세로로 서 있다. 원기둥 위에 좌석들을 모두 덮을 만큼 넓은 빨간 원뿔이 지붕처럼 얹혀 있다. 기둥 주위에 기둥보다 훨씬 작은 파란 구 8개가 원형으로 같은 간격으로 배치되어 좌석이다.' },
       { score: 50, prompt: '기둥 위에 지붕이 있고 주변에 공이 돈다' },
       { score: 20, prompt: '회전목마' },
     ],

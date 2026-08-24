@@ -12,8 +12,8 @@
  * live mode intentionally samples the first 6 cases to avoid surprise API cost.
  */
 
-import { RUBRICS } from '../src/data/rubrics.js'
-import { BATTLE_CHALLENGES } from '../src/data/challenges-battle.js'
+import { RUBRICS } from '../src/server-data/rubrics.js'
+import { BATTLE_CHALLENGES } from '../src/server-data/challenges.js'
 
 const args = process.argv.slice(2)
 

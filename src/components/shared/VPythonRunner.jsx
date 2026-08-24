@@ -2,10 +2,21 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { createBlobURL, revokeBlobURL } from '../../utils/glowscript.js'
 
 /**
+ * 에러 종류별 학생 안내 문구.
+ * 'syntax'는 AI가 만든 코드 자체가 깨진 경우라 네트워크 안내를 하면 안 된다.
+ */
+const ERROR_GUIDE = {
+  syntax: 'AI가 만든 코드에 문법 오류가 있어 3D 장면을 실행하지 못했어요. 설명을 조금 더 간결하게 나눠서 다시 시도해보세요.',
+  runtime: '3D 장면을 그리는 중에 오류가 났어요. 설명을 조금 더 간결하게 다듬어 다시 시도해보세요.',
+  resource: '3D 라이브러리를 불러오지 못했어요. 네트워크 상태를 확인하고 다시 시도해주세요.',
+  timeout: '3D 장면을 불러오는 데 시간이 너무 오래 걸려요. 네트워크 상태를 확인하고 다시 시도해주세요.',
+}
+
+/**
  * VPythonRunner
  * GlowScript 3.2 코드를 Blob URL iframe으로 렌더링
  * - 로딩 타임아웃 감지 (8초)
- * - postMessage 기반 에러 감지
+ * - postMessage 기반 에러 감지 (구문 오류 / 실행 오류 / 리소스 / 타임아웃 구분)
  * - 재시도 버튼
  *
  * Props:
@@ -14,7 +25,8 @@ import { createBlobURL, revokeBlobURL } from '../../utils/glowscript.js'
  *   height    string  — 기본 '300px'
  *   label     string  — 상단 레이블 (선택)
  *   autoRun   bool    — 코드 변경 시 자동 재실행 (기본 true)
- *   onError   func    — 에러 콜백 (선택)
+ *   onError   func    — 에러 콜백 (선택). { kind, message, guide } 를 받는다.
+ *   onReady   func    — 렌더링 성공 콜백 (선택). 부모가 실패 안내를 거둘 때 쓴다.
  */
 export default function VPythonRunner({
   code,
@@ -23,18 +35,45 @@ export default function VPythonRunner({
   label,
   autoRun = true,
   onError,
+  onReady,
 }) {
   const blobRef = useRef(null)
   const timerRef = useRef(null)
+  const iframeRef = useRef(null)
+  // status를 setTimeout 안에서 읽으면 클로저에 갇힌 옛 값을 보게 된다.
+  // (이 때문에 타임아웃 판정이 엉뚱하게 동작했다)
+  const statusRef = useRef('idle')
+  // onError는 부모가 렌더할 때마다 새 함수가 되기 쉽다(예: prompt 상태에 의존).
+  // 콜백에 직접 물리면 글자를 칠 때마다 iframe이 다시 로드되므로 ref로 받는다.
+  const onErrorRef = useRef(onError)
+  const onReadyRef = useRef(onReady)
+  useEffect(() => { onErrorRef.current = onError }, [onError])
+  useEffect(() => { onReadyRef.current = onReady }, [onReady])
+
   const [src, setSrc] = useState(null)
   const [error, setError] = useState(null)
+  const [errorKind, setErrorKind] = useState(null) // syntax | runtime | resource | timeout
   const [status, setStatus] = useState('idle') // idle | loading | ready | error
   const [retryCount, setRetryCount] = useState(0)
+
+  const applyStatus = useCallback((next) => {
+    statusRef.current = next
+    setStatus(next)
+  }, [])
+
+  const reportError = useCallback((kind, rawMessage) => {
+    const guide = ERROR_GUIDE[kind] || ERROR_GUIDE.runtime
+    applyStatus('error')
+    setErrorKind(kind)
+    setError(guide)
+    onErrorRef.current?.({ kind, message: rawMessage || guide, guide })
+  }, [applyStatus])
 
   const run = useCallback((c) => {
     if (!c?.trim()) return
     setError(null)
-    setStatus('loading')
+    setErrorKind(null)
+    applyStatus('loading')
 
     // 기존 Blob URL 해제
     if (blobRef.current) revokeBlobURL(blobRef.current)
@@ -46,41 +85,41 @@ export default function VPythonRunner({
       blobRef.current = url
       setSrc(url)
 
-      // 8초 타임아웃 — 렌더링 성공 메시지 안 오면 에러 처리
+      // 8초 타임아웃 — 렌더링 성공/실패 메시지가 둘 다 안 오면 에러 처리
       timerRef.current = setTimeout(() => {
-        if (status === 'loading') {
-          setStatus('error')
-          setError('렌더링 시간이 초과되었습니다. 네트워크를 확인하세요.')
-          onError?.('timeout')
+        if (statusRef.current === 'loading') {
+          reportError('timeout', 'timeout')
         }
       }, 8000)
     } catch (e) {
-      setError(e.message)
-      setStatus('error')
-      onError?.(e.message)
+      reportError('runtime', e.message)
     }
-  }, [onError])
+  }, [applyStatus, reportError])
 
   // postMessage 이벤트 수신
   useEffect(() => {
     const handleMessage = (e) => {
       if (!e.data?.type?.startsWith('glowscript:')) return
-      // 현재 iframe의 메시지인지 확인 (blob URL이 같을 때)
+      // 내 iframe이 보낸 메시지만 처리한다.
+      // (한 화면에 여러 Runner가 있으면 목표 장면 칸에 AI 장면의 오류가 뜨는 문제가 있었다)
+      const mine = iframeRef.current?.contentWindow
+      if (!mine || e.source !== mine) return
+
       if (e.data.type === 'glowscript:ready') {
-        setStatus('ready')
+        applyStatus('ready')
         setError(null)
+        setErrorKind(null)
         if (timerRef.current) clearTimeout(timerRef.current)
+        onReadyRef.current?.()
       } else if (e.data.type === 'glowscript:error') {
-        setStatus('error')
-        setError(e.data.message || '렌더링 중 오류가 발생했습니다')
         if (timerRef.current) clearTimeout(timerRef.current)
-        onError?.(e.data.message)
+        reportError(e.data.kind || 'runtime', e.data.message)
       }
     }
 
     window.addEventListener('message', handleMessage)
     return () => window.removeEventListener('message', handleMessage)
-  }, [onError])
+  }, [applyStatus, reportError])
 
   useEffect(() => {
     if (autoRun && code) run(code)
@@ -173,6 +212,8 @@ export default function VPythonRunner({
             <div style={{ color: '#f87171', fontSize: '0.8125rem', marginBottom: '12px', lineHeight: 1.5 }}>
               {error}
             </div>
+            {/* 구문 오류는 같은 코드를 다시 그려도 결과가 같으므로 재시도 버튼을 숨긴다 */}
+            {errorKind !== 'syntax' && (
             <button
               onClick={handleRetry}
               style={{
@@ -188,7 +229,8 @@ export default function VPythonRunner({
             >
               다시 시도
             </button>
-            {retryCount > 0 && (
+            )}
+            {errorKind !== 'syntax' && retryCount > 0 && (
               <span style={{ color: '#64748b', fontSize: '0.6875rem', marginTop: '6px' }}>
                 {retryCount}회 재시도
               </span>
@@ -199,6 +241,7 @@ export default function VPythonRunner({
         {src && (
           <iframe
             key={src}
+            ref={iframeRef}
             src={src}
             style={{ width: '100%', height: '100%', border: 'none', display: 'block' }}
             title="VPython Scene"

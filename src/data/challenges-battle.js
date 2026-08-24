@@ -18,6 +18,12 @@
  *   Level 1 — 상세 설명 (가이드)
  *   Level 2~3 — 간략 설명 (방향만 제시)
  *   Level 4~5 — null (3D 뷰만 보고 파악)
+ *
+ * ⚠️ 정답 코드(code)는 이 파일에 없다.
+ *    클라이언트 번들에 통째로 들어가면 학생이 23개 문제의 정답을 한 번에 읽을 수 있어
+ *    서버 전용 모듈 src/server-data/challenge-codes.js 로 분리했다.
+ *    서버는 src/server-data/challenges.js 에서 메타데이터 + 코드를 합쳐 쓰고,
+ *    클라이언트는 /api/challenges/:id 로 현재 라운드 한 건만 받아 간다.
  */
 
 export const BATTLE_CHALLENGES = [
@@ -29,7 +35,6 @@ export const BATTLE_CHALLENGES = [
     title: '포탈',
     description: '허공에 세워진 청록색 고리 — 게임 속 포탈처럼 보인다',
     shapes: ['고리(ring)'],
-    code: `ring({pos: vec(0,0,0), axis: vec(0,0,1), radius: 2, thickness: 0.3, color: color.cyan});`,
     ct: ['추상화'],
     hint: '이 고리가 바닥에 놓여 있나요, 세워져 있나요? 방향을 잘 관찰하세요',
   },
@@ -40,7 +45,6 @@ export const BATTLE_CHALLENGES = [
     title: '수박',
     description: '가로로 넓고 약간 납작한 초록색 타원체',
     shapes: ['타원체(ellipsoid)'],
-    code: `ellipsoid({pos: vec(0,0,0), size: vec(3,2,2), color: color.green});`,
     ct: ['추상화'],
     hint: '완전한 구와 어떻게 다른지 관찰하세요. 어느 방향이 더 긴가요?',
   },
@@ -51,7 +55,6 @@ export const BATTLE_CHALLENGES = [
     title: '비스듬한 화살표',
     description: '왼쪽 아래에서 오른쪽 위로 대각선으로 뻗은 자홍색 화살표',
     shapes: ['화살표(arrow)'],
-    code: `arrow({pos: vec(-2,-2,0), axis: vec(4,4,0), shaftwidth: 0.3, color: color.magenta});`,
     ct: ['추상화'],
     hint: '화살표가 어디에서 시작해서 어느 방향으로 뻗어 있는지, 색상은 무엇인지 정확히 묘사하세요',
   },
@@ -64,8 +67,6 @@ export const BATTLE_CHALLENGES = [
     title: '버섯',
     description: '버섯 한 송이',
     shapes: null,
-    code: `cylinder({pos: vec(0,-2,0), axis: vec(0,2.5,0), radius: 0.35, color: color.white});
-ellipsoid({pos: vec(0,0.8,0), size: vec(2.5,0.8,2.5), color: color.red});`,
     ct: ['분해'],
     hint: '줄기와 갓을 각각 어떤 도형으로 표현할지 생각해보세요',
   },
@@ -76,9 +77,6 @@ ellipsoid({pos: vec(0,0.8,0), size: vec(2.5,0.8,2.5), color: color.red});`,
     title: '모래시계',
     description: '모래시계',
     shapes: null,
-    code: `cone({pos: vec(0,2.5,0), axis: vec(0,-2.5,0), radius: 1.5, color: color.cyan});
-cone({pos: vec(0,-2.5,0), axis: vec(0,2.5,0), radius: 1.5, color: color.cyan});
-sphere({pos: vec(0,0,0), radius: 0.3, color: color.yellow});`,
     ct: ['분해', '추상화'],
     hint: '넓은 부분과 좁은 부분의 방향을 잘 관찰하세요',
   },
@@ -89,8 +87,6 @@ sphere({pos: vec(0,0,0), radius: 0.3, color: color.yellow});`,
     title: '토성',
     description: '행성 하나',
     shapes: null,
-    code: `sphere({pos: vec(0,0,0), radius: 1.5, color: color.yellow});
-ring({pos: vec(0,0,0), axis: vec(0,1,0), radius: 2.8, thickness: 0.15, color: color.orange});`,
     ct: ['분해'],
     hint: '본체와 그 주위의 것을 따로 묘사하세요',
   },
@@ -101,9 +97,6 @@ ring({pos: vec(0,0,0), axis: vec(0,1,0), radius: 2.8, thickness: 0.15, color: co
     title: '로켓',
     description: '서 있는 로켓',
     shapes: null,
-    code: `cylinder({pos: vec(0,-1,0), axis: vec(0,3,0), radius: 0.7, color: color.blue});
-cone({pos: vec(0,2,0), axis: vec(0,1.5,0), radius: 0.7, color: color.red});
-cone({pos: vec(0,-1,0), axis: vec(0,-1.2,0), radius: 0.7, color: color.orange});`,
     ct: ['분해'],
     hint: '위-중간-아래 각 부분의 도형과 색상을 설명하세요',
   },
@@ -114,12 +107,6 @@ cone({pos: vec(0,-1,0), axis: vec(0,-1.2,0), radius: 0.7, color: color.orange});
     title: '탁자 위 사과',
     description: '탁자 위에 과일이 놓여 있다',
     shapes: null,
-    code: `box({pos: vec(0,0,0), size: vec(4,0.3,3), color: vec(0.6,0.3,0.1)});
-cylinder({pos: vec(-1.5,-2,1), axis: vec(0,2,0), radius: 0.15, color: vec(0.6,0.3,0.1)});
-cylinder({pos: vec(1.5,-2,1), axis: vec(0,2,0), radius: 0.15, color: vec(0.6,0.3,0.1)});
-cylinder({pos: vec(-1.5,-2,-1), axis: vec(0,2,0), radius: 0.15, color: vec(0.6,0.3,0.1)});
-cylinder({pos: vec(1.5,-2,-1), axis: vec(0,2,0), radius: 0.15, color: vec(0.6,0.3,0.1)});
-sphere({pos: vec(0,0.55,0), radius: 0.4, color: color.red});`,
     ct: ['분해', '추상화'],
     hint: '탁자를 부품별로 나눠서 각각 설명하세요',
   },
@@ -132,9 +119,6 @@ sphere({pos: vec(0,0.55,0), radius: 0.4, color: color.red});`,
     title: '계단',
     description: '올라가는 계단',
     shapes: null,
-    code: `for (var i = 0; i < 6; i++) {
-    box({pos: vec(i*1.2-3, i*0.6-1.5, 0), size: vec(1, 0.5, 2), color: color.red});
-}`,
     ct: ['패턴인식', '알고리즘'],
     hint: '한 칸의 모양과, 전체가 어떤 규칙으로 이어지는지 설명하세요',
   },
@@ -145,11 +129,6 @@ sphere({pos: vec(0,0.55,0), radius: 0.4, color: color.red});`,
     title: '원형 울타리',
     description: '울타리',
     shapes: null,
-    code: `for (var i = 0; i < 12; i++) {
-    var angle = i * Math.PI * 2 / 12;
-    cylinder({pos: vec(Math.cos(angle)*3, -1, Math.sin(angle)*3),
-              axis: vec(0,2,0), radius: 0.15, color: color.yellow});
-}`,
     ct: ['패턴인식', '알고리즘'],
     hint: '기둥 하나의 생김새와 전체 배치 패턴을 설명하세요',
   },
@@ -160,14 +139,6 @@ sphere({pos: vec(0,0.55,0), radius: 0.4, color: color.red});`,
     title: '블록 피라미드',
     description: '블록으로 쌓은 피라미드',
     shapes: null,
-    code: `var rowColors = [color.orange, color.cyan, color.magenta];
-for (var row = 0; row < 3; row++) {
-    var count = 3 - row;
-    for (var i = 0; i < count; i++) {
-        box({pos: vec((i - (count-1)/2)*1.2, row*1.1, 0),
-             size: vec(1, 1, 1), color: rowColors[row]});
-    }
-}`,
     ct: ['패턴인식', '알고리즘', '분해'],
     hint: '각 층의 블록 수, 색상, 배치 규칙을 설명하세요',
   },
@@ -178,12 +149,6 @@ for (var row = 0; row < 3; row++) {
     title: '체스판',
     description: '체스판',
     shapes: null,
-    code: `for (var row = 0; row < 4; row++) {
-    for (var col = 0; col < 4; col++) {
-        var c = (row + col) % 2 === 0 ? color.white : color.black;
-        box({pos: vec(col*1.1-1.65, 0, row*1.1-1.65), size: vec(1,0.2,1), color: c});
-    }
-}`,
     ct: ['알고리즘', '패턴인식'],
     hint: '칸의 크기와 전체 배치, 색상 배치 규칙을 설명하세요',
   },
@@ -194,12 +159,6 @@ for (var row = 0; row < 3; row++) {
     title: '구슬 커튼',
     description: '무지개색 구슬 커튼',
     shapes: null,
-    code: `var rowColors = [color.red, color.orange, color.yellow, color.green, color.blue, color.magenta];
-for (var row = 0; row < 6; row++) {
-    for (var col = 0; col < 6; col++) {
-        sphere({pos: vec(col*1.2-3, row*1.2-3, 0), radius: 0.4, color: rowColors[row]});
-    }
-}`,
     ct: ['패턴인식', '알고리즘'],
     hint: '배열의 크기와 각 줄의 색 순서를 설명하세요',
   },
@@ -210,11 +169,6 @@ for (var row = 0; row < 6; row++) {
     title: '나선 탑',
     description: '나선형 탑',
     shapes: null,
-    code: `for (var i = 0; i < 30; i++) {
-    var angle = i * Math.PI / 5;
-    var y = i * 0.3 - 4.5;
-    sphere({pos: vec(Math.cos(angle)*2, y, Math.sin(angle)*2), radius: 0.25, color: color.cyan});
-}`,
     ct: ['패턴인식', '알고리즘'],
     hint: '하나하나 나열하지 말고, 전체 경로의 패턴을 설명하세요',
   },
@@ -225,15 +179,6 @@ for (var row = 0; row < 6; row++) {
     title: '3D 피라미드',
     description: '입체 피라미드',
     shapes: null,
-    code: `for (var layer = 0; layer < 4; layer++) {
-    var size = 4 - layer;
-    for (var x = 0; x < size; x++) {
-        for (var z = 0; z < size; z++) {
-            box({pos: vec((x-(size-1)/2)*1.1, layer*1.1, (z-(size-1)/2)*1.1),
-                 size: vec(1, 1, 1), color: color.orange});
-        }
-    }
-}`,
     ct: ['패턴인식', '알고리즘', '분해'],
     hint: '각 층의 가로x세로 개수가 어떤 규칙으로 줄어드는지 설명하세요',
   },
@@ -246,13 +191,6 @@ for (var row = 0; row < 6; row++) {
     title: '눈사람',
     description: null,
     shapes: null,
-    code: `sphere({pos: vec(0,-2,0), radius: 1.5, color: color.white});
-sphere({pos: vec(0,0,0), radius: 1.1, color: color.white});
-sphere({pos: vec(0,1.7,0), radius: 0.8, color: color.white});
-cone({pos: vec(0,1.7,0), axis: vec(0,0,0.7), radius: 0.12, color: color.orange});
-sphere({pos: vec(-0.25,1.95,0.65), radius: 0.08, color: color.black});
-sphere({pos: vec(0.25,1.95,0.65), radius: 0.08, color: color.black});
-cylinder({pos: vec(0,2.35,0), axis: vec(0,0.6,0), radius: 0.55, color: color.black});`,
     ct: ['분해', '추상화'],
     hint: '전체를 부분별로 나누고, 각 부분의 도형/색/위치를 하나씩 설명하세요',
   },
@@ -263,11 +201,6 @@ cylinder({pos: vec(0,2.35,0), axis: vec(0,0.6,0), radius: 0.55, color: color.bla
     title: '신호등',
     description: null,
     shapes: null,
-    code: `box({pos: vec(0,0,0), size: vec(1.2,3.5,0.8), color: vec(0.15,0.15,0.15)});
-sphere({pos: vec(0,1,0.35), radius: 0.35, color: color.red});
-sphere({pos: vec(0,0,0.35), radius: 0.35, color: color.yellow});
-sphere({pos: vec(0,-1,0.35), radius: 0.35, color: color.green});
-cylinder({pos: vec(0,-3.5,0), axis: vec(0,1.75,0), radius: 0.12, color: vec(0.3,0.3,0.3)});`,
     ct: ['분해', '추상화'],
     hint: '전체를 구성 부품으로 나누고, 각 부품의 위치 관계를 설명하세요',
   },
@@ -278,11 +211,6 @@ cylinder({pos: vec(0,-3.5,0), axis: vec(0,1.75,0), radius: 0.12, color: vec(0.3,
     title: '도시 스카이라인',
     description: null,
     shapes: null,
-    code: `box({pos: vec(-4,0,0), size: vec(1.5,4,1.5), color: color.blue});
-box({pos: vec(-2,1.5,0), size: vec(1.2,7,1.2), color: color.cyan});
-box({pos: vec(0,0.5,0), size: vec(1.8,5,1.8), color: vec(0.5,0.5,0.5)});
-box({pos: vec(2,2,0), size: vec(1,8,1), color: color.white});
-box({pos: vec(4,-0.5,0), size: vec(2,3,2), color: color.orange});`,
     ct: ['분해', '추상화'],
     hint: '각 건물의 높이, 너비, 색상을 비교하며 왼쪽부터 순서대로 설명하세요',
   },
@@ -293,11 +221,6 @@ box({pos: vec(4,-0.5,0), size: vec(2,3,2), color: color.orange});`,
     title: '균형 저울',
     description: null,
     shapes: null,
-    code: `cone({pos: vec(0,-2,0), axis: vec(0,2,0), radius: 1, color: color.yellow});
-cylinder({pos: vec(0,0,0), axis: vec(4,0,0), radius: 0.1, color: vec(0.5,0.5,0.5)});
-cylinder({pos: vec(0,0,0), axis: vec(-4,0,0), radius: 0.1, color: vec(0.5,0.5,0.5)});
-sphere({pos: vec(4,0,0), radius: 0.6, color: color.red});
-sphere({pos: vec(-4,0,0), radius: 0.9, color: color.blue});`,
     ct: ['분해', '추상화'],
     hint: '받침, 막대, 양쪽 추를 각각 설명하세요. 좌우 차이에 주목하세요',
   },
@@ -310,13 +233,6 @@ sphere({pos: vec(-4,0,0), radius: 0.9, color: color.blue});`,
     title: '꽃',
     description: null,
     shapes: null,
-    code: `cylinder({pos: vec(0,-3,0), axis: vec(0,3,0), radius: 0.1, color: color.green});
-for (var i = 0; i < 5; i++) {
-    var a = i * Math.PI * 2 / 5;
-    ellipsoid({pos: vec(Math.cos(a)*0.8, 0.5+Math.sin(a)*0.3, Math.sin(a)*0.8),
-               size: vec(0.8, 0.3, 0.4), color: color.magenta});
-}
-sphere({pos: vec(0,0.5,0), radius: 0.3, color: color.yellow});`,
     ct: ['분해', '패턴인식'],
     hint: '줄기, 꽃잎, 꽃술을 각각 설명하세요. 꽃잎의 배치 패턴에 주목하세요',
   },
@@ -327,14 +243,6 @@ sphere({pos: vec(0,0.5,0), radius: 0.3, color: color.yellow});`,
     title: '로봇 얼굴',
     description: null,
     shapes: null,
-    code: `box({pos: vec(0,0,0), size: vec(3,2.5,2), color: vec(0.6,0.6,0.7)});
-sphere({pos: vec(-0.6,0.3,0.9), radius: 0.3, color: color.yellow});
-sphere({pos: vec(0.6,0.3,0.9), radius: 0.3, color: color.yellow});
-box({pos: vec(0,-0.5,0.95), size: vec(1,0.2,0.1), color: color.red});
-cylinder({pos: vec(-0.7,1.25,0), axis: vec(0,1,0), radius: 0.08, color: vec(0.6,0.6,0.7)});
-cylinder({pos: vec(0.7,1.25,0), axis: vec(0,1,0), radius: 0.08, color: vec(0.6,0.6,0.7)});
-sphere({pos: vec(-0.7,2.25,0), radius: 0.15, color: color.red});
-sphere({pos: vec(0.7,2.25,0), radius: 0.15, color: color.red});`,
     ct: ['분해', '추상화'],
     hint: '머리, 눈, 입, 안테나를 각각 설명하세요. 좌우 대칭에 주목하세요',
   },
@@ -345,13 +253,6 @@ sphere({pos: vec(0.7,2.25,0), radius: 0.15, color: color.red});`,
     title: '분자 모형',
     description: null,
     shapes: null,
-    code: `sphere({pos: vec(0,0,0), radius: 0.8, color: color.red});
-cylinder({pos: vec(0,0,0), axis: vec(2,1,0), radius: 0.1, color: vec(0.5,0.5,0.5)});
-sphere({pos: vec(2,1,0), radius: 0.5, color: color.blue});
-cylinder({pos: vec(0,0,0), axis: vec(-2,1,0), radius: 0.1, color: vec(0.5,0.5,0.5)});
-sphere({pos: vec(-2,1,0), radius: 0.5, color: color.blue});
-cylinder({pos: vec(0,0,0), axis: vec(0,-2,1.5), radius: 0.1, color: vec(0.5,0.5,0.5)});
-sphere({pos: vec(0,-2,1.5), radius: 0.5, color: color.green});`,
     ct: ['분해', '추상화'],
     hint: '중심, 결합봉, 끝 원자를 각각 설명하세요. 3차원 방향에 주목하세요',
   },
@@ -362,12 +263,6 @@ sphere({pos: vec(0,-2,1.5), radius: 0.5, color: color.green});`,
     title: '회전목마',
     description: null,
     shapes: null,
-    code: `cylinder({pos: vec(0,-2,0), axis: vec(0,4,0), radius: 0.3, color: color.yellow});
-cone({pos: vec(0,2,0), axis: vec(0,2,0), radius: 3, color: color.red});
-for (var i = 0; i < 8; i++) {
-    var a = i * Math.PI * 2 / 8;
-    sphere({pos: vec(Math.cos(a)*2.2, 0, Math.sin(a)*2.2), radius: 0.35, color: color.blue});
-}`,
     ct: ['분해', '패턴인식'],
     hint: '중심 기둥, 지붕, 좌석을 각각 설명하세요. 좌석의 배치 패턴에 주목하세요',
   },

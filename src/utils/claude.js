@@ -51,12 +51,24 @@ function getHeaders(teamId) {
 
 /**
  * 프롬프트로 VPython 코드 생성 (Haiku)
+ *
+ * repair — 선택. 직전에 만든 코드가 렌더링에 실패했을 때 그 사실을 함께 보낸다.
+ *   { previousCode, errorMessage }
+ * 서버는 이 정보를 생성 프롬프트에 넣어 "같은 장면을 더 단순한 구조로,
+ * 문법적으로 완결된 코드로" 다시 만들게 한다. 없으면 기존과 동일하게 동작한다.
  */
-export async function generateCode(prompt, teamId = null) {
+export async function generateCode(prompt, teamId = null, repair = null) {
+  const body = { prompt, teamId }
+  if (repair?.previousCode) {
+    body.repair = {
+      previousCode: repair.previousCode,
+      errorMessage: repair.errorMessage || '',
+    }
+  }
   const res = await fetch(`${BASE}/generate`, {
     method: 'POST',
     headers: getHeaders(teamId),
-    body: JSON.stringify({ prompt, teamId }),
+    body: JSON.stringify(body),
   })
   if (!res.ok) throw await toReadableError(res)
   return res.json()  // { code }
