@@ -1,7 +1,10 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
+import { setTeamToken } from '../utils/teamAuth.js'
 
 const LS_TEACHER_CODE = 'vpython_teacher_code'
+// 자동 프리필은 제거. 직전에 쓰던 코드는 힌트 문구로만 노출하고
+// 사용자가 명시적으로 클릭해야 복원되도록 한다.
 
 const WELCOME_EMOJIS = ['🎉', '🚀', '⭐', '🔥', '💎', '🌟', '✨', '🎯', '🧠', '💡']
 const CONFETTI_COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899', '#06b6d4']
@@ -39,7 +42,8 @@ function Confetti() {
 
 export default function JoinPage() {
   const navigate = useNavigate()
-  const [teacherCode, setTeacherCode] = useState(() => localStorage.getItem(LS_TEACHER_CODE) || '')
+  const [teacherCode, setTeacherCode] = useState('')
+  const [lastTeacherCode] = useState(() => localStorage.getItem(LS_TEACHER_CODE) || '')
   const [s1Number, setS1Number] = useState('')
   const [s1Name, setS1Name] = useState('')
   const [s2Number, setS2Number] = useState('')
@@ -47,6 +51,85 @@ export default function JoinPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [welcome, setWelcome] = useState(null)
+  // alreadyRegistered 응답을 받았을 때의 선택 상태
+  const [existingChoice, setExistingChoice] = useState(null)
+  // { sessionId, teamId, spectator, students }
+  // 정원 초과로 관람 모드가 됐을 때의 안내 상태 — 조용히 넘기지 않고 반드시 화면에 띄운다
+  const [capacityNotice, setCapacityNotice] = useState(null)
+  // { sessionId, message, teamCount, maxTeams }
+
+  const submitRegister = async (opts = {}) => {
+    const { forceNewTeam = false } = opts
+    const students = [{ studentNumber: s1Number.trim(), studentName: s1Name.trim() }]
+    if (s2Number.trim() && s2Name.trim()) {
+      students.push({ studentNumber: s2Number.trim(), studentName: s2Name.trim() })
+    }
+
+    try {
+      const res = await fetch('/api/session/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ teacherCode: teacherCode.trim(), students, forceNewTeam }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setError(data.error || '등록 실패')
+        setLoading(false)
+        setExistingChoice(null)
+        return
+      }
+
+      if (data.spectator) {
+        if (data.alreadyRegistered && !forceNewTeam) {
+          setExistingChoice({
+            sessionId: data.sessionId,
+            teamId: null,
+            spectator: true,
+            students,
+            reason: data.reason,
+            message: data.message,
+          })
+          setLoading(false)
+          return
+        }
+        // 정원 초과로 관람 모드가 된 경우 — 바로 넘기지 않고 사유를 먼저 보여준다
+        if (data.reason === 'capacity') {
+          setCapacityNotice({
+            sessionId: data.sessionId,
+            message: data.message || '팀 정원이 모두 찼습니다. 관람 모드로 참여합니다. 선생님께 알려주세요.',
+            teamCount: data.teamCount,
+            maxTeams: data.maxTeams,
+          })
+          setLoading(false)
+          return
+        }
+        navigate(`/spectator/${data.sessionId}`)
+        return
+      }
+
+      if (data.alreadyRegistered && !forceNewTeam) {
+        setExistingChoice({
+          sessionId: data.sessionId,
+          teamId: data.teamId,
+          teamToken: data.teamToken,
+          spectator: false,
+          students,
+        })
+        setLoading(false)
+        return
+      }
+
+      const emoji = WELCOME_EMOJIS[Math.floor(Math.random() * WELCOME_EMOJIS.length)]
+      const names = students.map(s => s.studentName).join(', ')
+      setTeamToken(data.teamId, data.teamToken)
+      setWelcome({ teamId: data.teamId, emoji, names })
+      setTimeout(() => navigate(`/team/${data.teamId}`), 2500)
+    } catch (e) {
+      setError('서버 연결 실패. 새로고침 후 다시 시도해주세요.')
+      setLoading(false)
+      setExistingChoice(null)
+    }
+  }
 
   const handleJoin = async () => {
     if (!teacherCode.trim()) return setError('수업코드를 입력해주세요')
@@ -58,47 +141,213 @@ export default function JoinPage() {
     setLoading(true)
     setError('')
     localStorage.setItem(LS_TEACHER_CODE, teacherCode.trim())
+    await submitRegister()
+  }
 
-    const students = [{ studentNumber: s1Number.trim(), studentName: s1Name.trim() }]
-    if (s2Number.trim() && s2Name.trim()) {
-      students.push({ studentNumber: s2Number.trim(), studentName: s2Name.trim() })
-    }
-
-    try {
-      const res = await fetch('/api/session/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ teacherCode: teacherCode.trim(), students }),
+  // 이전 팀으로 들어가기
+  const handleEnterExisting = () => {
+    if (!existingChoice) return
+    if (existingChoice.spectator) {
+      navigate(`/spectator/${existingChoice.sessionId}`, {
+        state: { reason: existingChoice.reason, message: existingChoice.message },
       })
-      const data = await res.json()
-      if (!res.ok) {
-        setError(data.error || '등록 실패')
-        setLoading(false)
-        return
-      }
-
-      if (data.spectator) {
-        navigate(`/spectator/${data.sessionId}`)
-        return
-      }
-
-      if (data.alreadyRegistered) {
-        navigate(`/team/${data.teamId}`)
-        return
-      }
-
-      const emoji = WELCOME_EMOJIS[Math.floor(Math.random() * WELCOME_EMOJIS.length)]
-      const names = students.map(s => s.studentName).join(', ')
-      setWelcome({ teamId: data.teamId, emoji, names })
-      setTimeout(() => navigate(`/team/${data.teamId}`), 2500)
-    } catch (e) {
-      setError('서버 연결 실패. 새로고침 후 다시 시도해주세요.')
-      setLoading(false)
+    } else {
+      setTeamToken(existingChoice.teamId, existingChoice.teamToken)
+      navigate(`/team/${existingChoice.teamId}`)
     }
+  }
+
+  // 새 팀으로 새로 등록 (이전 등록 폐기)
+  const handleForceNewTeam = async () => {
+    setLoading(true)
+    setError('')
+    await submitRegister({ forceNewTeam: true })
+  }
+
+  const handleUseLastCode = () => {
+    if (lastTeacherCode) setTeacherCode(lastTeacherCode)
   }
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter') handleJoin()
+  }
+
+  // 정원 초과 안내 화면 — 관람 모드로 떨어졌다는 사실을 학생이 반드시 보게 한다
+  if (capacityNotice) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'var(--bg)',
+        padding: '24px',
+      }}>
+        <div style={{
+          width: '100%',
+          maxWidth: '440px',
+          background: 'var(--surface)',
+          border: '2px solid #f97316',
+          borderRadius: 'var(--radius-lg)',
+          padding: '28px',
+          animation: 'fadeIn 0.4s ease-out',
+        }}>
+          <div style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '4px 12px',
+            background: '#f97316',
+            color: 'white',
+            borderRadius: '20px',
+            fontSize: '0.75rem',
+            fontWeight: 800,
+            marginBottom: '14px',
+          }}>
+            ⚠️ 정원 초과
+          </div>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '10px' }}>
+            팀을 더 만들 수 없어요
+          </h2>
+          <p style={{ color: 'var(--text)', fontSize: '0.9375rem', lineHeight: 1.6, marginBottom: '8px' }}>
+            {capacityNotice.message}
+          </p>
+          {capacityNotice.maxTeams != null && (
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.8125rem', marginBottom: '20px' }}>
+              현재 {capacityNotice.teamCount ?? capacityNotice.maxTeams} / {capacityNotice.maxTeams}팀
+            </p>
+          )}
+          <button
+            onClick={() => navigate(`/spectator/${capacityNotice.sessionId}`, {
+              state: { reason: 'capacity', message: capacityNotice.message },
+            })}
+            style={{
+              width: '100%',
+              padding: '13px',
+              background: '#f97316',
+              color: 'white',
+              border: 'none',
+              borderRadius: 'var(--radius)',
+              fontSize: '1rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              marginBottom: '10px',
+            }}
+          >
+            👀 관람 모드로 들어가기
+          </button>
+          <button
+            onClick={() => { setCapacityNotice(null); setLoading(false) }}
+            style={{
+              width: '100%',
+              padding: '10px',
+              background: 'none',
+              color: 'var(--text-muted)',
+              border: 'none',
+              fontSize: '0.8125rem',
+              cursor: 'pointer',
+              textDecoration: 'underline',
+            }}
+          >
+            돌아가서 다시 시도하기
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // 이미 등록된 학번일 때 — 이전 팀 / 새 팀 선택 화면
+  if (existingChoice) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'var(--bg)',
+        padding: '24px',
+      }}>
+        <div style={{
+          width: '100%',
+          maxWidth: '440px',
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--radius-lg)',
+          padding: '28px',
+        }}>
+          <h2 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '8px' }}>
+            이미 이 수업에 등록되어 있어요
+          </h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '20px' }}>
+            같은 학번이 이미 등록된 기록이 있습니다. 어떻게 진행할까요?
+          </p>
+          {existingChoice.spectator && existingChoice.reason === 'capacity' && (
+            <div style={{
+              padding: '12px 14px',
+              background: 'rgba(249, 115, 22, 0.12)',
+              border: '1px solid #f97316',
+              borderRadius: 'var(--radius)',
+              fontSize: '0.8125rem',
+              lineHeight: 1.5,
+              marginBottom: '16px',
+            }}>
+              ⚠️ {existingChoice.message || '정원 초과로 관람 모드입니다. 선생님께 알려주세요.'}
+            </div>
+          )}
+          <button
+            onClick={handleEnterExisting}
+            disabled={loading}
+            style={{
+              width: '100%',
+              padding: '12px',
+              background: 'var(--accent)',
+              color: 'white',
+              border: 'none',
+              borderRadius: 'var(--radius)',
+              fontSize: '1rem',
+              fontWeight: 700,
+              cursor: loading ? 'not-allowed' : 'pointer',
+              marginBottom: '10px',
+            }}
+          >
+            {existingChoice.spectator ? '관람자로 들어가기' : '이전 팀으로 들어가기'}
+          </button>
+          <button
+            onClick={handleForceNewTeam}
+            disabled={loading}
+            style={{
+              width: '100%',
+              padding: '12px',
+              background: 'transparent',
+              color: 'var(--text)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius)',
+              fontSize: '0.9375rem',
+              fontWeight: 600,
+              cursor: loading ? 'not-allowed' : 'pointer',
+              marginBottom: '10px',
+            }}
+          >
+            {loading ? '만드는 중...' : '새 팀으로 새로 시작하기'}
+          </button>
+          <button
+            onClick={() => { setExistingChoice(null); setLoading(false) }}
+            style={{
+              width: '100%',
+              padding: '10px',
+              background: 'none',
+              color: 'var(--text-muted)',
+              border: 'none',
+              fontSize: '0.8125rem',
+              cursor: 'pointer',
+              textDecoration: 'underline',
+            }}
+          >
+            취소하고 수업코드 다시 확인
+          </button>
+        </div>
+      </div>
+    )
   }
 
   // 환영 화면
@@ -186,6 +435,24 @@ export default function JoinPage() {
           style={inputStyle}
           autoFocus
         />
+        {lastTeacherCode && lastTeacherCode !== teacherCode && (
+          <button
+            type="button"
+            onClick={handleUseLastCode}
+            style={{
+              marginTop: '6px',
+              background: 'none',
+              border: 'none',
+              color: 'var(--text-muted)',
+              fontSize: '0.75rem',
+              cursor: 'pointer',
+              textDecoration: 'underline',
+              padding: 0,
+            }}
+          >
+            지난번 코드 “{lastTeacherCode}” 다시 쓰기
+          </button>
+        )}
 
         {/* 팀원 1 (필수) */}
         <div style={{

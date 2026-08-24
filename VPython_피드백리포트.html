@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&display=swap');
+
+  @page {
+    size: A4;
+    margin: 0;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
+    color: #1e293b;
+    font-size: 10pt;
+    line-height: 1.6;
+  }
+
+  .page {
+    width: 210mm;
+    min-height: 297mm;
+    padding: 20mm;
+    page-break-after: always;
+    position: relative;
+  }
+
+  /* ── 표지 ─────────────────────── */
+  .cover {
+    background: linear-gradient(135deg, #3b82f6, #6366f1, #8b5cf6);
+    color: white;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 40mm 30mm;
+  }
+  .cover-badge {
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 20px;
+    padding: 6px 20px;
+    font-size: 10pt;
+    margin-bottom: 20px;
+    letter-spacing: 2px;
+  }
+  .cover h1 {
+    font-size: 30pt;
+    font-weight: 900;
+    margin-bottom: 8px;
+    letter-spacing: -1px;
+  }
+  .cover .subtitle {
+    font-size: 13pt;
+    opacity: 0.85;
+    margin-bottom: 40px;
+    font-weight: 300;
+  }
+  .cover-stats {
+    display: flex;
+    gap: 16px;
+    margin-top: 30px;
+  }
+  .stat-card {
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 12px;
+    padding: 16px 22px;
+    min-width: 100px;
+  }
+  .stat-card .num {
+    font-size: 24pt;
+    font-weight: 900;
+  }
+  .stat-card .label {
+    font-size: 8pt;
+    opacity: 0.8;
+    margin-top: 2px;
+  }
+  .cover-info {
+    background: rgba(255,255,255,0.1);
+    border-radius: 12px;
+    padding: 20px 30px;
+    margin-top: 40px;
+    text-align: left;
+    font-size: 9.5pt;
+    line-height: 2;
+  }
+  .cover-info span { opacity: 0.7; }
+  .cover-footer {
+    margin-top: auto;
+    font-size: 8pt;
+    opacity: 0.6;
+  }
+
+  /* ── 섹션 헤더 ────────────────── */
+  .section-header {
+    margin-bottom: 20px;
+  }
+  .section-header h2 {
+    font-size: 18pt;
+    font-weight: 900;
+    color: #1e293b;
+    margin-bottom: 4px;
+  }
+  .section-header .sub {
+    font-size: 9pt;
+    color: #64748b;
+  }
+  .section-header .line {
+    height: 3px;
+    background: linear-gradient(to right, #3b82f6, #6366f1);
+    border-radius: 2px;
+    margin-top: 8px;
+  }
+
+  /* ── 바 차트 ──────────────────── */
+  .bar-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .bar-label {
+    width: 140px;
+    font-size: 9pt;
+    font-weight: 500;
+    color: #374151;
+    flex-shrink: 0;
+  }
+  .bar-track {
+    flex: 1;
+    height: 14px;
+    background: #e5e7eb;
+    border-radius: 7px;
+    overflow: hidden;
+    margin: 0 10px;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 7px;
+    transition: width 0.3s;
+  }
+  .bar-value {
+    width: 80px;
+    font-size: 8.5pt;
+    font-weight: 700;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  /* ── 인용 카드 ────────────────── */
+  .quote-card {
+    background: #f8fafc;
+    border-left: 4px solid #3b82f6;
+    border-radius: 0 8px 8px 0;
+    padding: 10px 14px;
+    margin-bottom: 8px;
+    font-size: 8.5pt;
+    color: #475569;
+    line-height: 1.7;
+  }
+  .quote-card p { margin: 0; }
+
+  /* ── 인사이트 카드 ─────────────── */
+  .insight-card {
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+    border-left: 5px solid;
+  }
+  .insight-card h3 {
+    font-size: 11pt;
+    font-weight: 700;
+    margin-bottom: 4px;
+    color: #1e293b;
+  }
+  .insight-card p {
+    font-size: 8.5pt;
+    color: #475569;
+    line-height: 1.7;
+  }
+
+  /* ── 추천 카드 ────────────────── */
+  .rec-card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 14px 16px 14px 50px;
+    margin-bottom: 10px;
+    position: relative;
+  }
+  .rec-num {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    color: white;
+    font-weight: 900;
+    font-size: 13pt;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .rec-card h3 {
+    font-size: 10pt;
+    font-weight: 700;
+    margin-bottom: 3px;
+  }
+  .rec-card p {
+    font-size: 8.5pt;
+    color: #64748b;
+    line-height: 1.6;
+  }
+
+  .two-col {
+    display: flex;
+    gap: 14px;
+  }
+  .two-col > div { flex: 1; }
+
+  .sub-heading {
+    font-size: 12pt;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 18px 0 10px;
+  }
+</style>
+</head>
+<body>
+
+<!-- ====== 표지 ====== -->
+<div class="page cover">
+  <div class="cover-badge">VPython Prompt Challenge</div>
+  <h1>학생 피드백<br>분석 리포트</h1>
+  <p class="subtitle">AI 프롬프트 코딩 수업 결과 보고서</p>
+
+  <div class="cover-stats">
+    <div class="stat-card">
+      <div class="num">54명</div>
+      <div class="label">총 참여 학생</div>
+    </div>
+    <div class="stat-card">
+      <div class="num">96%</div>
+      <div class="label">수업 만족도</div>
+    </div>
+    <div class="stat-card">
+      <div class="num">2학급</div>
+      <div class="label">참여 학급</div>
+    </div>
+    <div class="stat-card">
+      <div class="num">5종</div>
+      <div class="label">챌린지 수</div>
+    </div>
+  </div>
+
+  <div class="cover-info">
+    <span>수업명</span>&nbsp;&nbsp;&nbsp;AI 프롬프트로 3D 도형 만들기 (VPython)<br>
+    <span>수업 도구</span>&nbsp;&nbsp;&nbsp;Claude AI (Haiku + Sonnet) + VPython 3D<br>
+    <span>수업 형태</span>&nbsp;&nbsp;&nbsp;2인 1팀 협력 + 팀 간 경쟁 (프롬프트 챌린지)<br>
+    <span>작성일</span>&nbsp;&nbsp;&nbsp;2026.03.19
+  </div>
+
+  <div class="cover-footer">https://vpython-prompt-challenge.fly.dev</div>
+</div>
+
+<!-- ====== 어려운 문제 분석 ====== -->
+<div class="page">
+  <div class="section-header">
+    <h2>어려운 문제 분석</h2>
+    <p class="sub">학생들이 가장 어렵다고 느낀 챌린지와 그 이유</p>
+    <div class="line"></div>
+  </div>
+
+  <div class="sub-heading">어떤 문제가 제일 어려웠나요?</div>
+  
+        <div class="bar-row">
+          <div class="bar-label">탁자 위 사과</div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:100.0%;background:#ef4444"></div>
+          </div>
+          <div class="bar-value" style="color:#ef4444">16명 (30%)</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">피라미드</div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:43.75%;background:#f59e0b"></div>
+          </div>
+          <div class="bar-value" style="color:#f59e0b">7명 (13%)</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">기타</div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:43.75%;background:#6366f1"></div>
+          </div>
+          <div class="bar-value" style="color:#6366f1">7명 (13%)</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">나선탑/소용돌이</div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:43.75%;background:#14b8a6"></div>
+          </div>
+          <div class="bar-value" style="color:#14b8a6">7명 (13%)</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">계단</div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:31.25%;background:#3b82f6"></div>
+          </div>
+          <div class="bar-value" style="color:#3b82f6">5명 (9%)</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">모래시계</div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:25.0%;background:#a855f7"></div>
+          </div>
+          <div class="bar-value" style="color:#a855f7">4명 (7%)</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">체스판</div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:25.0%;background:#22c55e"></div>
+          </div>
+          <div class="bar-value" style="color:#22c55e">4명 (7%)</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">무지개 구슬</div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:12.5%;background:#f97316"></div>
+          </div>
+          <div class="bar-value" style="color:#f97316">2명 (4%)</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">화살표</div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:6.25%;background:#64748b"></div>
+          </div>
+          <div class="bar-value" style="color:#64748b">1명 (2%)</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">원형 울타리</div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:6.25%;background:#ec4899"></div>
+          </div>
+          <div class="bar-value" style="color:#ec4899">1명 (2%)</div>
+        </div>
+
+  <div class="sub-heading" style="margin-top:24px">왜 어렵다고 느꼈을까?</div>
+  
+        <div class="bar-row">
+          <div class="bar-label">위치/간격 설정의 어려움</div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:100.0%;background:#ef4444"></div>
+          </div>
+          <div class="bar-value" style="color:#ef4444">15명 (28%)</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">복잡한 구조 설명의 한계</div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:86.66666666666667%;background:#f59e0b"></div>
+          </div>
+          <div class="bar-value" style="color:#f59e0b">13명 (24%)</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">정확한 수치 표현의 어려움</div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:40.0%;background:#6366f1"></div>
+          </div>
+          <div class="bar-value" style="color:#6366f1">6명 (11%)</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">AI가 의도대로 생성하지 않음</div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:33.33333333333333%;background:#14b8a6"></div>
+          </div>
+          <div class="bar-value" style="color:#14b8a6">5명 (9%)</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">시간 부족</div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:6.666666666666667%;background:#3b82f6"></div>
+          </div>
+          <div class="bar-value" style="color:#3b82f6">1명 (2%)</div>
+        </div>
+</div>
+
+<!-- ====== 학습 성과 ====== -->
+<div class="page">
+  <div class="section-header">
+    <h2>학습 성과 분석</h2>
+    <p class="sub">학생들이 수업을 통해 깨달은 것들</p>
+    <div class="line"></div>
+  </div>
+
+  <div class="sub-heading">오늘 무엇을 배웠나요? (주제 분류)</div>
+  
+        <div class="bar-row">
+          <div class="bar-label">AI 활용/명령 방법</div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:100.0%;background:#ef4444"></div>
+          </div>
+          <div class="bar-value" style="color:#ef4444">18명 (33%)</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">정확한 프롬프트 작성법</div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:83.33333333333334%;background:#f59e0b"></div>
+          </div>
+          <div class="bar-value" style="color:#f59e0b">15명 (28%)</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">코딩과의 비교</div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:55.55555555555556%;background:#6366f1"></div>
+          </div>
+          <div class="bar-value" style="color:#6366f1">10명 (19%)</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">AI의 한계 인식</div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:27.77777777777778%;background:#14b8a6"></div>
+          </div>
+          <div class="bar-value" style="color:#14b8a6">5명 (9%)</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label">협력의 중요성</div>
+          <div class="bar-track">
+            <div class="bar-fill" style="width:16.666666666666664%;background:#3b82f6"></div>
+          </div>
+          <div class="bar-value" style="color:#3b82f6">3명 (6%)</div>
+        </div>
+
+  <div class="sub-heading" style="margin-top:22px">학생들의 깊이 있는 성찰</div>
+  
+        <div class="quote-card" style="border-left-color:#3b82f6">
+          <p>"ai가 100% 만드는것이 아님을 알게 되었다. 중요한 업무는 손수 하는것이 더 좋다."</p>
+        </div>
+        <div class="quote-card" style="border-left-color:#6366f1">
+          <p>"AI에게 질문을 할 땐 크게 틀을 잡은 후 세세하게 덧붙여야 할 것 같다."</p>
+        </div>
+        <div class="quote-card" style="border-left-color:#14b8a6">
+          <p>"AI로 코드를 생성하는 것이 사람이 직접 코딩하는 것보다 시간적으로 훨씬 효율적이다."</p>
+        </div>
+        <div class="quote-card" style="border-left-color:#22c55e">
+          <p>"조금은 두루뭉실하게 이해 가능할 정도로 하고 오차를 조금씩 좁히는 것이 가장 편한 방법"</p>
+        </div>
+        <div class="quote-card" style="border-left-color:#a855f7">
+          <p>"AI에게 말로 코딩하는게 어렵고, 어떤 부분은 파이썬으로 하는게 더 쉬울 것 같다."</p>
+        </div>
+        <div class="quote-card" style="border-left-color:#f59e0b">
+          <p>"프롬프트를 길게 쓰는 것만이 중요한 게 아니라 직관적이고 상대적인 수치가 도움이 된다."</p>
+        </div>
+        <div class="quote-card" style="border-left-color:#ef4444">
+          <p>"챗지피티같은 인공지능에게는 아무렇게나 말해도 다 알아들었는데 다른 인공지능은 아닐 수도 있다는 것을 알았다."</p>
+        </div>
+</div>
+
+<!-- ====== 학생 소감 ====== -->
+<div class="page">
+  <div class="section-header">
+    <h2>학생 소감 하이라이트</h2>
+    <p class="sub">수업에 대한 학생들의 생생한 목소리</p>
+    <div class="line"></div>
+  </div>
+
+  <div class="sub-heading">참여 소감</div>
+  
+        <div class="quote-card" style="border-left-color:#3b82f6">
+          <p>"ai 한테 프롬프트를 적어 원하는 모양을 만드는게 어렵고 잘 설명한거 같은데 이상한 모양이 나와서 머리가 아팠다"</p>
+        </div>
+        <div class="quote-card" style="border-left-color:#6366f1">
+          <p>"ai가 제 말을 잘 못 알아들때도 있지만 잘 알아들을 때도 있어서 재밌었다"</p>
+        </div>
+        <div class="quote-card" style="border-left-color:#14b8a6">
+          <p>"너무 재미있었고 내가 하는 말을 못알아들었을때 화가 났지만 전체적으로 좋았다."</p>
+        </div>
+        <div class="quote-card" style="border-left-color:#22c55e">
+          <p>"직접 AI프로그램의 프롬포트를 입력하면서 AI가 내 말을 얼마나 알아듣는지 알아본 것 같다."</p>
+        </div>
+        <div class="quote-card" style="border-left-color:#a855f7">
+          <p>"진짜 너무 재밌었어요. AI가 나의 말에 따라 모양을 만드는게 신기하고 흥미로웠습니다."</p>
+        </div>
+        <div class="quote-card" style="border-left-color:#f59e0b">
+          <p>"코딩을 겉으로만 들어봤을땐 엄청 어려운데, 직접 말로 해보니 재미있고 쉽게 할수있었다."</p>
+        </div>
+        <div class="quote-card" style="border-left-color:#ef4444">
+          <p>"처음에는 정확한 숫자로만 표현하려고 해서 어려웠지만 후반부에서는 쉽고 단순하게 표현해서 재밌었다"</p>
+        </div>
+        <div class="quote-card" style="border-left-color:#ec4899">
+          <p>"코딩으로 배웠던 내용을 말로 설명해서 실행할 수 있다는 것이 좋은 경험이었다."</p>
+        </div>
+
+  <div class="sub-heading" style="margin-top:20px">선생님께 하고 싶은 말</div>
+  
+        <div class="quote-card" style="border-left-color:#3b82f6">
+          <p>"ai에게 명령해서 만들어주는 건 생각을 깊게 할 수 있어서 좋았어요!"</p>
+        </div>
+        <div class="quote-card" style="border-left-color:#6366f1">
+          <p>"시간 조금만 더 주셨으면 좋았을 거 같아요"</p>
+        </div>
+        <div class="quote-card" style="border-left-color:#14b8a6">
+          <p>"이런 수업 재미있어요 앞으로도 잘 부탁드립니다"</p>
+        </div>
+        <div class="quote-card" style="border-left-color:#22c55e">
+          <p>"수업은 재밌는데 ai가 말을 안들어요."</p>
+        </div>
+        <div class="quote-card" style="border-left-color:#a855f7">
+          <p>"짝 활동 하는게 너무너무 재밌어요!"</p>
+        </div>
+        <div class="quote-card" style="border-left-color:#f59e0b">
+          <p>"오늘 수업 너무 재밌었습니다!"</p>
+        </div>
+        <div class="quote-card" style="border-left-color:#ef4444">
+          <p>"게임처럼 배울 수 있다는 점이 정말 좋았습니다!"</p>
+        </div>
+        <div class="quote-card" style="border-left-color:#ec4899">
+          <p>"프로그램이 재밌어서 수업이 재밌었어요."</p>
+        </div>
+</div>
+
+<!-- ====== 교사용 인사이트 ====== -->
+<div class="page">
+  <div class="section-header">
+    <h2>교사용 인사이트</h2>
+    <p class="sub">피드백 분석을 바탕으로 한 핵심 발견</p>
+    <div class="line"></div>
+  </div>
+
+  <div class="insight-card" style="background:#f0fdf4;border-left-color:#22c55e">
+    <h3>수업 만족도 96%</h3>
+    <p>대다수의 학생이 '재미있었다'고 응답. 게임형 경쟁 구조(팀 대결, 실시간 점수)와 짝 활동이 높은 몰입도의 핵심 요인. '코딩이 아닌 자연어로 한다'는 점이 접근 장벽을 크게 낮춤.</p>
+  </div>
+
+  <div class="insight-card" style="background:#fef2f2;border-left-color:#ef4444">
+    <h3>가장 어려운 문제: 탁자 위 사과</h3>
+    <p>'탁자 위 사과'가 압도적 1위. 복합 객체(다리 4개 + 판 + 구)의 공간 배치를 자연어로 표현하는 것이 학생들에게 가장 어려운 과제. 다리 사이 간격, 판과의 결합 위치 등을 언어로 전달하기 난해.</p>
+  </div>
+
+  <div class="insight-card" style="background:#fffbeb;border-left-color:#f59e0b">
+    <h3>AI 채점 신뢰도 이슈</h3>
+    <p>다수의 학생이 'AI 채점이 불공정하다'고 느낌. 육안으로 비슷한데 점수가 낮거나, 간단한 프롬프트가 오히려 높은 점수를 받는 사례가 보고됨. '똑같은데 92점만 준다', '우리가 더 잘 만들었는데 다른 팀이 더 높다' 등의 불만.</p>
+  </div>
+
+  <div class="insight-card" style="background:#eff6ff;border-left-color:#3b82f6">
+    <h3>핵심 학습 성과: 프롬프트 엔지니어링</h3>
+    <p>'AI에게 정확하게 설명해야 한다'는 프롬프트 엔지니어링의 기본을 대부분의 학생이 체득. 특히 '추상적 표현 vs 수치 기반 설명'의 차이, '큰 틀 먼저 → 세부 조정' 전략을 스스로 발견한 학생들이 다수.</p>
+  </div>
+
+  <div class="insight-card" style="background:#f5f3ff;border-left-color:#8b5cf6">
+    <h3>학생이 발견한 프롬프트 전략들</h3>
+    <p>1) 큰 틀 먼저 잡고 세부 조정하기 &nbsp; 2) 수치 기반으로 객관적으로 설명하기 &nbsp; 3) 너무 길면 오히려 역효과 &nbsp; 4) 반복 수정으로 오차 좁히기 &nbsp; 5) AI의 힌트/피드백을 적극 활용하기</p>
+  </div>
+
+  <div class="insight-card" style="background:#f0fdfa;border-left-color:#14b8a6">
+    <h3>협력 학습의 효과</h3>
+    <p>짝 활동의 가치를 학생들이 직접 언급. '혼자보다 같이 하니 더 좋은 결과', '서로 부족한 점 보완', '의견의 중간지점을 찾는 능력' 등. 비(非)코딩 전공 학생도 '포기하지 않고 끝까지 참여했다'고 응답.</p>
+  </div>
+</div>
+
+<!-- ====== 수업 개선 제안 ====== -->
+<div class="page">
+  <div class="section-header">
+    <h2>수업 개선 제안</h2>
+    <p class="sub">다음 수업을 위한 구체적인 개선 방향</p>
+    <div class="line"></div>
+  </div>
+
+  <div class="rec-card">
+    <div class="rec-num" style="background:#3b82f6">1</div>
+    <h3>문제 난이도 단계화</h3>
+    <p>복합 객체(탁자 등)는 힌트를 단계별로 제공하거나, 중간 단계 문제를 추가하여 학생들이 점진적으로 난이도를 올릴 수 있도록 설계. '탁자 판만 먼저 만들기 → 다리 추가' 같은 분할 접근 도입.</p>
+  </div>
+
+  <div class="rec-card">
+    <div class="rec-num" style="background:#f59e0b">2</div>
+    <h3>AI 채점 기준 사전 안내</h3>
+    <p>학생들에게 채점 기준(코드 구조 비교, 객체 수, 색상, 위치 등)을 사전에 안내하여 '불공정하다'는 느낌을 줄이고, 학생이 전략적으로 프롬프트를 개선할 수 있도록 유도.</p>
+  </div>
+
+  <div class="rec-card">
+    <div class="rec-num" style="background:#ef4444">3</div>
+    <h3>시간 관리 유연화</h3>
+    <p>문제당 3분 이상 또는 문제 수를 줄이고 깊이 있게 도전할 수 있는 옵션 제공. 일부 학생이 시간 부족을 호소. 난이도별 차등 시간 부여도 고려.</p>
+  </div>
+
+  <div class="rec-card">
+    <div class="rec-num" style="background:#22c55e">4</div>
+    <h3>프롬프트 전략 미니 가이드</h3>
+    <p>수업 시작 전 2분간 '프롬프트 작성 팁'을 안내: 수치 기반 설명, 큰 틀 먼저 접근법, 한 번에 모든 것을 쓰지 않고 반복 수정하기 등.</p>
+  </div>
+
+  <div class="rec-card">
+    <div class="rec-num" style="background:#6366f1">5</div>
+    <h3>결과 공유 토론 시간</h3>
+    <p>각 팀의 프롬프트를 화면에 나란히 띄워 비교하고 분석하는 시간 추가. 점수 차이의 원인을 함께 토론하면 학생 간 배움이 더욱 풍부해질 것.</p>
+  </div>
+
+  <div class="rec-card">
+    <div class="rec-num" style="background:#a855f7">6</div>
+    <h3>다양한 평가 축 도입</h3>
+    <p>점수 외에 '가장 창의적인 프롬프트', '가장 많이 개선한 팀', '가장 짧은 프롬프트로 높은 점수' 등 다양한 시상 카테고리로 모든 팀의 성취감을 강화.</p>
+  </div>
+</div>
+
+</body>
+</html>

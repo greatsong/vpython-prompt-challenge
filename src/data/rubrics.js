@@ -1,0 +1,517 @@
+/**
+ * 문제별 평가 루브릭 — 프롬프트 품질 기반 채점
+ *
+ * 5축 평가 프레임워크 (2026-04-20 개편):
+ *   structure  (25%) 구조·분해  — 부분 명명, 부분-전체 관계, 반복 규칙, 대칭·순서 같은 구조적 규칙
+ *   spatial    (25%) 공간 관계  — 방향, 배치, 접합, 정면/측면, 수직/수평, 내부/외부
+ *   proportion (20%) 비율       — 부분 간 상대적 크기, 길이, 두께, 납작함, 크기 감소/증가
+ *   shape      (10%) 도형 종류  — 어떤 기본 도형(구/상자/원뿔 등)으로 표현할지
+ *   color      (5%)  색         — 색상 언급 (유사어 관대)
+ *   CT         (15%) 사고력 보너스 — 체계성·일관성·재현 가능성
+ *
+ * Lv1(단일 도형)은 structure 축이 없으므로 spatial/proportion/shape에 재분배.
+ *
+ * 구조:
+ *   elements[]  — 필수 요소 (name, desc, weight, category)
+ *   ct          — CT 사고력 보너스 (focus, maxPoints, criteria)
+ *   anchors[]   — 점수 앵커 (score, prompt) 3단계
+ */
+
+export const RUBRICS = {
+  // ═══════════════════════════════════════════════════════════
+  // Level 1: 정밀 묘사 (도형 1개) — spatial/proportion 중심
+  // ═══════════════════════════════════════════════════════════
+
+  'battle-01': {
+    elements: [
+      { name: '세워진 방향', desc: '세워져 있다/수직/정면을 향한다', weight: 20, category: 'spatial' },
+      { name: '고리 평면', desc: '바닥에 눕혀져 있지 않다/앞뒤로 향한다', weight: 10, category: 'spatial' },
+      { name: '중앙 위치', desc: '중앙에/가운데', weight: 10, category: 'spatial' },
+      { name: '두께 얇음', desc: '얇은/가느다란/두께 언급', weight: 13, category: 'proportion' },
+      { name: '크기 큼', desc: '크다/반지름이 큼/꽤 넓다', weight: 12, category: 'proportion' },
+      { name: '고리 도형', desc: '고리/링/도넛 형태 언급', weight: 15, category: 'shape' },
+      { name: '청록색', desc: '청록/시안/하늘색 계열', weight: 5, category: 'color' },
+    ],
+    ct: { focus: '추상화', maxPoints: 15,
+      criteria: '눈에 보이는 형태를 방향·크기 같은 속성 언어로 재구성하는 능력' },
+    anchors: [
+      { score: 93, prompt: '중앙에 청록색 고리가 하나 있다. 바닥에 눕혀진 게 아니라 수직으로 세워져 있다. 두께는 얇고 크기는 꽤 크다.' },
+      { score: 55, prompt: '파란 동그라미가 서 있다' },
+      { score: 20, prompt: '포탈' },
+    ],
+  },
+
+  'battle-02': {
+    elements: [
+      { name: '가로 방향 긺', desc: '가로로 길다/옆으로 넓다/한 방향이 더 길다', weight: 22, category: 'proportion' },
+      { name: '납작함', desc: '납작하다/위아래로 짧다/찌그러진', weight: 14, category: 'proportion' },
+      { name: '구가 아님', desc: '완전한 구가 아니다/비율 차이 명시', weight: 4, category: 'proportion' },
+      { name: '장축 수평', desc: '가로로 누워있다/수평 방향', weight: 15, category: 'spatial' },
+      { name: '타원체 도형', desc: '타원/타원체/럭비공/달걀 형태', weight: 25, category: 'shape' },
+      { name: '초록색', desc: '초록/녹색', weight: 5, category: 'color' },
+    ],
+    ct: { focus: '추상화', maxPoints: 15,
+      criteria: '구와 타원체의 차이를 비율 언어로 정확히 서술하는 능력' },
+    anchors: [
+      { score: 93, prompt: '중앙에 초록색 타원체가 있다. 완전한 구가 아니라 가로 방향으로 더 길고 약간 납작한 형태이다.' },
+      { score: 55, prompt: '초록색 공이 있다' },
+      { score: 20, prompt: '수박' },
+    ],
+  },
+
+  'battle-03': {
+    elements: [
+      { name: '대각선 방향', desc: '대각선/비스듬/사선', weight: 18, category: 'spatial' },
+      { name: '왼쪽 아래 시작', desc: '왼쪽 아래에서/아래쪽에서 출발', weight: 12, category: 'spatial' },
+      { name: '오른쪽 위 향함', desc: '오른쪽 위를 향해/우상향', weight: 10, category: 'spatial' },
+      { name: '화살표 길이', desc: '길게 뻗은/길이감 언급', weight: 10, category: 'proportion' },
+      { name: '화살표 도형', desc: '화살표/화살/arrow', weight: 25, category: 'shape' },
+      { name: '화살촉 방향성', desc: '뾰족한 끝이 어느 방향/화살촉 언급', weight: 5, category: 'shape' },
+      { name: '자홍색', desc: '자홍/마젠타/분홍 계열', weight: 5, category: 'color' },
+    ],
+    ct: { focus: '추상화', maxPoints: 15,
+      criteria: '방향을 두 축(시작-끝)의 공간 관계로 분해하여 서술하는 능력' },
+    anchors: [
+      { score: 93, prompt: '자홍색 화살표가 하나 있다. 왼쪽 아래에서 오른쪽 위를 향해 대각선으로 비스듬히 뻗어 있다.' },
+      { score: 55, prompt: '분홍 화살표가 있다' },
+      { score: 20, prompt: '화살표' },
+    ],
+  },
+
+  // ═══════════════════════════════════════════════════════════
+  // Level 2: 분해와 재조합 — structure/spatial/proportion 중심
+  // ═══════════════════════════════════════════════════════════
+
+  'battle-04': {
+    elements: [
+      { name: '줄기-갓 분해', desc: '줄기와 갓 두 부분으로 나눠서 설명', weight: 12, category: 'structure' },
+      { name: '줄기 부분 명명', desc: '줄기/기둥/아래 부분 언급', weight: 7, category: 'structure' },
+      { name: '갓 부분 명명', desc: '갓/머리/위 부분 언급', weight: 6, category: 'structure' },
+      { name: '위아래 관계', desc: '줄기 위에 갓이 얹혀/올려져', weight: 15, category: 'spatial' },
+      { name: '줄기 수직', desc: '줄기가 세로로 서 있다', weight: 10, category: 'spatial' },
+      { name: '줄기 가늘기', desc: '가느다란/얇은/가는 줄기', weight: 8, category: 'proportion' },
+      { name: '갓 넓고 납작', desc: '갓이 넓고 납작/편평', weight: 12, category: 'proportion' },
+      { name: '줄기 원기둥', desc: '원기둥/기둥 형태', weight: 5, category: 'shape' },
+      { name: '갓 타원/반구', desc: '타원체/반구/납작한 구', weight: 5, category: 'shape' },
+      { name: '줄기 흰색', desc: '흰색/하얀색', weight: 3, category: 'color' },
+      { name: '갓 빨간색', desc: '빨간/빨강', weight: 2, category: 'color' },
+    ],
+    ct: { focus: '분해', maxPoints: 15,
+      criteria: '버섯을 줄기와 갓으로 분해하고 각 부분의 형태·관계를 독립적으로 서술하는 능력' },
+    anchors: [
+      { score: 92, prompt: '가느다란 흰색 원기둥이 세로로 서 있다. 그 원기둥 위에 빨간색으로 넓고 납작한 타원체가 버섯 갓처럼 얹혀 있다.' },
+      { score: 55, prompt: '흰 기둥 위에 빨간 게 있다' },
+      { score: 20, prompt: '버섯' },
+    ],
+  },
+
+  'battle-05': {
+    elements: [
+      { name: '부분 분해(원뿔2+구)', desc: '원뿔 두 개와 가운데 구로 나눠서 설명', weight: 15, category: 'structure' },
+      { name: '꼭짓점 맞닿음 규칙', desc: '꼭짓점끼리/좁은 부분이 만남', weight: 10, category: 'structure' },
+      { name: '위 원뿔 아래 향함', desc: '위쪽 원뿔이 아래를 향함/넓은 면이 위', weight: 10, category: 'spatial' },
+      { name: '아래 원뿔 위 향함', desc: '아래 원뿔이 위를 향함/넓은 면이 아래', weight: 10, category: 'spatial' },
+      { name: '구의 중앙 위치', desc: '구가 가운데에/맞닿는 지점에', weight: 5, category: 'spatial' },
+      { name: '구 작음', desc: '작은/조그만 구', weight: 10, category: 'proportion' },
+      { name: '원뿔 크기 관계', desc: '두 원뿔이 비슷한 크기/대칭', weight: 10, category: 'proportion' },
+      { name: '원뿔·구 구분', desc: '원뿔과 구를 명확히 구분', weight: 10, category: 'shape' },
+      { name: '원뿔 청록', desc: '청록/시안', weight: 3, category: 'color' },
+      { name: '구 노란색', desc: '노란/노랑', weight: 2, category: 'color' },
+    ],
+    ct: { focus: '분해', maxPoints: 15,
+      criteria: '모래시계를 원뿔+구로 분해하고, 원뿔의 방향성을 체계적으로 서술하는 능력' },
+    anchors: [
+      { score: 92, prompt: '청록색 원뿔 두 개가 있다. 위쪽 원뿔은 넓은 부분이 위에 있고 아래로 좁아진다. 아래쪽 원뿔은 넓은 부분이 아래에 있고 위로 좁아진다. 두 꼭짓점이 가운데서 만난다. 만나는 지점에 작은 노란색 구가 있다.' },
+      { score: 55, prompt: '원뿔 두 개가 위아래로 있고 가운데 공이 있다' },
+      { score: 20, prompt: '모래시계' },
+    ],
+  },
+
+  'battle-06': {
+    elements: [
+      { name: '구-고리 분해', desc: '구와 고리 두 부분으로 나눠 설명', weight: 12, category: 'structure' },
+      { name: '감싸는 관계', desc: '고리가 구를 감싸다/둘러싸다', weight: 10, category: 'structure' },
+      { name: '고리 수평', desc: '수평/가로/바닥과 평행', weight: 15, category: 'spatial' },
+      { name: '고리가 구 주변', desc: '구를 중심으로/구 주위에', weight: 10, category: 'spatial' },
+      { name: '고리가 구보다 큼', desc: '고리가 구보다 크다/넓다', weight: 20, category: 'proportion' },
+      { name: '구·고리 구분', desc: '구와 고리를 구분해서 명명', weight: 10, category: 'shape' },
+      { name: '구 노란색', desc: '노란/노랑', weight: 4, category: 'color' },
+      { name: '고리 주황색', desc: '주황/오렌지', weight: 4, category: 'color' },
+    ],
+    ct: { focus: '분해', maxPoints: 15,
+      criteria: '토성을 구+고리로 분해하고, 고리의 방향과 크기 관계를 서술하는 능력' },
+    anchors: [
+      { score: 93, prompt: '중앙에 노란색 구가 있다. 그 구를 감싸는 주황색 고리가 수평으로 떠 있다. 고리는 구보다 훨씬 크다.' },
+      { score: 55, prompt: '노란 공에 주황 고리' },
+      { score: 20, prompt: '토성' },
+    ],
+  },
+
+  'battle-07': {
+    elements: [
+      { name: '세 부분 분해', desc: '머리/동체/화염 3부분으로 나눠 설명', weight: 15, category: 'structure' },
+      { name: '위-가운데-아래 순서', desc: '위에서 아래로 머리-동체-화염 배치 규칙', weight: 10, category: 'structure' },
+      { name: '머리 원뿔 위 향함', desc: '머리는 위쪽, 뾰족한 끝이 위', weight: 8, category: 'spatial' },
+      { name: '화염 원뿔 아래 향함', desc: '화염은 아래쪽, 뾰족한 끝이 아래', weight: 8, category: 'spatial' },
+      { name: '동체 세로 기립', desc: '동체가 세로로 서 있다', weight: 5, category: 'spatial' },
+      { name: '동체 길쭉함', desc: '동체가 길쭉하다/세로로 긺', weight: 7, category: 'proportion' },
+      { name: '머리·화염 크기', desc: '머리와 화염이 동체보다 작거나 비교 언급', weight: 8, category: 'proportion' },
+      { name: '원기둥·원뿔 구분', desc: '동체 원기둥, 머리·화염 원뿔로 구분', weight: 10, category: 'shape' },
+      { name: '동체 파란색', desc: '파란/파랑', weight: 5, category: 'color' },
+      { name: '머리 빨간색', desc: '빨간/빨강', weight: 5, category: 'color' },
+      { name: '화염 주황색', desc: '주황/오렌지', weight: 4, category: 'color' },
+    ],
+    ct: { focus: '분해', maxPoints: 15,
+      criteria: '로켓을 세 부분으로 분해하고 각 부분의 도형·방향·위치를 체계적으로 서술하는 능력' },
+    anchors: [
+      { score: 92, prompt: '파란색 원기둥이 세로로 서 있다. 그 위에 빨간색 원뿔이 위를 향하고 있다. 원기둥 아래에는 주황색 원뿔이 아래를 향한다.' },
+      { score: 55, prompt: '파란 기둥 위에 빨간 뿔, 아래에 주황 뿔' },
+      { score: 20, prompt: '로켓' },
+    ],
+  },
+
+  'battle-08': {
+    elements: [
+      { name: '상판·다리·사과 분해', desc: '상판, 다리, 사과 세 부분 구분', weight: 10, category: 'structure' },
+      { name: '다리 4개 규칙', desc: '다리가 4개/네 다리', weight: 10, category: 'structure' },
+      { name: '수직 계층 관계', desc: '다리→상판→사과 위아래 층 구조', weight: 10, category: 'structure' },
+      { name: '다리가 상판 받침', desc: '다리가 상판 아래/상판을 받치다', weight: 8, category: 'spatial' },
+      { name: '사과가 상판 위', desc: '사과가 상판 위에 놓여', weight: 8, category: 'spatial' },
+      { name: '다리 네 모서리', desc: '다리가 네 모서리에/네 귀에', weight: 5, category: 'spatial' },
+      { name: '상판 넓고 납작', desc: '넓고 납작한/얇은 판', weight: 7, category: 'proportion' },
+      { name: '다리 가느다람', desc: '가느다란/얇은 다리', weight: 8, category: 'proportion' },
+      { name: '상판·다리·사과 도형', desc: '상자/원기둥/구로 표현', weight: 10, category: 'shape' },
+      { name: '갈색', desc: '탁자 갈색/나무색', weight: 5, category: 'color' },
+      { name: '사과 빨간', desc: '사과 빨간/빨강', weight: 4, category: 'color' },
+    ],
+    ct: { focus: '분해', maxPoints: 15,
+      criteria: '탁자를 상판+다리로 분해하고, 사과와의 공간 관계까지 체계적으로 서술하는 능력' },
+    anchors: [
+      { score: 93, prompt: '갈색의 넓고 납작한 상자가 탁자 상판이다. 상판 네 모서리 아래에 갈색의 가느다란 원기둥 4개가 다리로 세워져 있다. 상판 위 가운데에 빨간색 작은 구가 사과처럼 놓여 있다.' },
+      { score: 55, prompt: '갈색 탁자가 있고 위에 빨간 사과가 있다' },
+      { score: 25, prompt: '탁자와 사과' },
+    ],
+  },
+
+  // ═══════════════════════════════════════════════════════════
+  // Level 3: 반복 패턴 — structure(패턴 규칙) 강화
+  // ═══════════════════════════════════════════════════════════
+
+  'battle-09': {
+    elements: [
+      { name: '6개 계단 패턴', desc: '6개가 계단처럼 배치된다는 규칙', weight: 15, category: 'structure' },
+      { name: '한 칸씩 규칙', desc: '한 칸씩 올라감/일정한 간격 증가', weight: 15, category: 'structure' },
+      { name: '왼→오, 아래→위 방향', desc: '왼쪽 아래에서 오른쪽 위로', weight: 15, category: 'spatial' },
+      { name: '단차 방향', desc: '단계별로 수직·수평 이동이 결합', weight: 10, category: 'spatial' },
+      { name: '상자 납작함', desc: '납작한/얇은 단', weight: 10, category: 'proportion' },
+      { name: '상자 도형', desc: '상자/직육면체/블록', weight: 10, category: 'shape' },
+      { name: '개수 정확', desc: '6개/여섯 개', weight: 5, category: 'shape' },
+      { name: '빨간색', desc: '빨간/빨강', weight: 5, category: 'color' },
+    ],
+    ct: { focus: '패턴+알고리즘', maxPoints: 15,
+      criteria: '계단의 반복 규칙(한 칸씩 위+오른쪽)을 패턴으로 인식하고 서술하는 능력' },
+    anchors: [
+      { score: 92, prompt: '빨간색 납작한 상자 6개가 계단처럼 배치되어 있다. 왼쪽 아래에서 시작해서 오른쪽 위로 한 칸씩 올라간다.' },
+      { score: 55, prompt: '빨간 상자 여러 개가 계단 모양이다' },
+      { score: 20, prompt: '계단' },
+    ],
+  },
+
+  'battle-10': {
+    elements: [
+      { name: '원형 배치 규칙', desc: '원을 그리며/원형으로 둘레 배치', weight: 18, category: 'structure' },
+      { name: '균등 간격 규칙', desc: '균등하게/같은 간격으로', weight: 12, category: 'structure' },
+      { name: '12개 배열', desc: '12개/열두 개', weight: 10, category: 'structure' },
+      { name: '세워져 있음', desc: '수직으로 서 있다', weight: 10, category: 'spatial' },
+      { name: '원 중심 향함', desc: '원 중심을 향함/방사 배치', weight: 5, category: 'spatial' },
+      { name: '가느다람', desc: '가느다란/얇은 기둥', weight: 10, category: 'proportion' },
+      { name: '원기둥 도형', desc: '원기둥/기둥/막대', weight: 10, category: 'shape' },
+      { name: '개수 정확', desc: '12개 명시', weight: 5, category: 'shape' },
+      { name: '노란색', desc: '노란/노랑', weight: 5, category: 'color' },
+    ],
+    ct: { focus: '패턴+알고리즘', maxPoints: 15,
+      criteria: '원형 배치의 반복 규칙(개수, 등간격, 원 반지름)을 패턴으로 인식하고 서술하는 능력' },
+    anchors: [
+      { score: 92, prompt: '노란색 가느다란 원기둥 12개가 원을 그리면서 균등한 간격으로 세워져 있다.' },
+      { score: 55, prompt: '노란 기둥들이 둥글게 서 있다' },
+      { score: 20, prompt: '울타리' },
+    ],
+  },
+
+  'battle-11': {
+    elements: [
+      { name: '3층 구조', desc: '3층/세 층으로 쌓임', weight: 15, category: 'structure' },
+      { name: '3-2-1 감소 규칙', desc: '아래 3, 가운데 2, 위 1 개수 규칙', weight: 15, category: 'structure' },
+      { name: '층별 색상 변화', desc: '층마다 다른 색', weight: 10, category: 'structure' },
+      { name: '가운데 정렬', desc: '가운데 정렬/위로 갈수록 안쪽', weight: 10, category: 'spatial' },
+      { name: '위로 쌓임', desc: '아래→위로 쌓임', weight: 5, category: 'spatial' },
+      { name: '각 블록 비슷한 크기', desc: '블록 크기 일정', weight: 5, category: 'proportion' },
+      { name: '정육면체 도형', desc: '정육면체/상자/블록', weight: 10, category: 'shape' },
+      { name: '주황·청록·자홍', desc: '세 색 모두 언급', weight: 15, category: 'color' },
+    ],
+    ct: { focus: '패턴+분해', maxPoints: 15,
+      criteria: '피라미드의 층별 규칙(개수 감소, 색상 변화, 정렬)을 패턴으로 인식하고 서술하는 능력' },
+    anchors: [
+      { score: 92, prompt: '정육면체 블록이 피라미드처럼 쌓여 있다. 맨 아래층에 주황색 3개, 가운데층에 청록색 2개, 꼭대기에 자홍색 1개. 위로 갈수록 하나씩 줄어들고 가운데 정렬이다.' },
+      { score: 55, prompt: '색깔 다른 블록이 피라미드처럼 쌓여 있다' },
+      { score: 20, prompt: '피라미드' },
+    ],
+  },
+
+  'battle-12': {
+    elements: [
+      { name: '4x4 격자 규칙', desc: '4x4/4줄 4칸/16개 격자', weight: 15, category: 'structure' },
+      { name: '번갈아 색상 규칙', desc: '흰-검이 한 칸씩 교대로', weight: 20, category: 'structure' },
+      { name: '다음 줄 반대 시작', desc: '다음 줄은 반대 색으로 시작', weight: 10, category: 'structure' },
+      { name: '동일 평면 배치', desc: '평평하게/바닥 같은 평면', weight: 8, category: 'spatial' },
+      { name: '납작한 칸', desc: '납작한/얇은 칸', weight: 7, category: 'proportion' },
+      { name: '상자 도형', desc: '정사각형/상자', weight: 10, category: 'shape' },
+      { name: '16칸 명시', desc: '16개/총 칸 수', weight: 5, category: 'shape' },
+      { name: '흰-검 사용', desc: '흰색과 검은색 두 색', weight: 10, category: 'color' },
+    ],
+    ct: { focus: '알고리즘+패턴', maxPoints: 15,
+      criteria: '체스판의 색상 교차 규칙을 정확히 인식하고, 격자 크기와 배치 규칙을 알고리즘적으로 서술하는 능력' },
+    anchors: [
+      { score: 92, prompt: '납작한 정사각형 상자가 4줄 4칸, 총 16개 격자로 배열되어 있다. 같은 줄에서 흰색과 검은색이 한 칸씩 번갈아 나오고, 다음 줄은 반대 색으로 시작한다.' },
+      { score: 55, prompt: '흰색 검은색 상자가 4x4로 놓여 있다' },
+      { score: 20, prompt: '체스판' },
+    ],
+  },
+
+  'battle-13': {
+    elements: [
+      { name: '6x6 격자', desc: '6x6/6행 6열/36개', weight: 12, category: 'structure' },
+      { name: '행별 단일 색 규칙', desc: '한 행은 한 가지 색/행마다 색이 다름', weight: 15, category: 'structure' },
+      { name: '무지개 순서', desc: '빨-주-노-초-파-보 순서 규칙', weight: 13, category: 'structure' },
+      { name: '격자 정렬', desc: '줄 맞춰/정렬된 격자', weight: 10, category: 'spatial' },
+      { name: '구 크기 균일', desc: '크기가 균일한/같은 크기', weight: 5, category: 'proportion' },
+      { name: '구 도형', desc: '구/공/구슬', weight: 10, category: 'shape' },
+      { name: '6색 무지개', desc: '빨강·주황·노랑·초록·파랑·자홍 다수 언급', weight: 20, category: 'color' },
+    ],
+    ct: { focus: '패턴+알고리즘', maxPoints: 15,
+      criteria: '격자 배치 규칙과 행별 색상 순서 패턴을 정확히 인식하고 서술하는 능력' },
+    anchors: [
+      { score: 92, prompt: '구 36개가 6행 6열 격자로 배열되어 있다. 각 행이 아래부터 빨강, 주황, 노랑, 초록, 파랑, 자홍 순서로 무지개 색이다.' },
+      { score: 55, prompt: '여러 색 구가 격자로 놓여 있다' },
+      { score: 20, prompt: '구슬 커튼' },
+    ],
+  },
+
+  'battle-14': {
+    elements: [
+      { name: '나선형 경로', desc: '나선/헬릭스/스프링 경로', weight: 20, category: 'structure' },
+      { name: '회전+상승 결합 규칙', desc: '회전하면서 동시에 위로 이동', weight: 15, category: 'structure' },
+      { name: '30개 배열', desc: '30개/서른 개', weight: 5, category: 'structure' },
+      { name: '위로 올라감', desc: '아래→위로 상승', weight: 10, category: 'spatial' },
+      { name: '원을 그리며', desc: '원/나선형으로 도는 경로', weight: 10, category: 'spatial' },
+      { name: '구 작음', desc: '작은/조그만 구', weight: 10, category: 'proportion' },
+      { name: '구 도형', desc: '구/공', weight: 10, category: 'shape' },
+      { name: '청록색', desc: '청록/시안', weight: 5, category: 'color' },
+    ],
+    ct: { focus: '패턴+알고리즘', maxPoints: 15,
+      criteria: '나선 경로의 본질(회전+상승 결합)을 인식하고, 개별 나열이 아닌 전체 패턴으로 서술하는 능력' },
+    anchors: [
+      { score: 90, prompt: '청록색 작은 구 30개가 나선형으로 배치되어 있다. 아래에서 위로 올라가면서 빙글빙글 회전하는 경로를 따른다.' },
+      { score: 55, prompt: '파란 공들이 빙글빙글 올라간다' },
+      { score: 20, prompt: '나선 탑' },
+    ],
+  },
+
+  'battle-15': {
+    elements: [
+      { name: '4층 구조', desc: '4층/네 층으로 쌓임', weight: 10, category: 'structure' },
+      { name: '4x4→3x3→2x2→1 규칙', desc: '층마다 한 변씩 줄어드는 규칙', weight: 20, category: 'structure' },
+      { name: '3D 입체 배치', desc: '가로세로 모두/입체적 3D', weight: 10, category: 'structure' },
+      { name: '가운데 정렬', desc: '위로 갈수록 안쪽/중심 정렬', weight: 10, category: 'spatial' },
+      { name: '각 층 크기 비교', desc: '층 간 크기 차이 명시', weight: 10, category: 'proportion' },
+      { name: '정육면체 도형', desc: '정육면체/상자/큐브', weight: 10, category: 'shape' },
+      { name: '피라미드 전체 형태', desc: '피라미드/위로 갈수록 작아짐', weight: 10, category: 'shape' },
+      { name: '주황색', desc: '주황/오렌지', weight: 5, category: 'color' },
+    ],
+    ct: { focus: '패턴+알고리즘', maxPoints: 15,
+      criteria: '3D 피라미드의 층별 감소 규칙(4x4→3x3→2x2→1)을 인식하고, 입체 구조를 서술하는 능력' },
+    anchors: [
+      { score: 90, prompt: '주황색 정육면체 블록이 피라미드 형태로 쌓여 있다. 맨 아래층은 4x4(16개), 그 위에 3x3(9개), 그 위에 2x2(4개), 꼭대기에 1개. 총 4층이다.' },
+      { score: 55, prompt: '주황 블록이 피라미드처럼 쌓여 있다' },
+      { score: 20, prompt: '3D 피라미드' },
+    ],
+  },
+
+  // ═══════════════════════════════════════════════════════════
+  // Level 4: 복합 구조 — 분해/공간/비율 고르게
+  // ═══════════════════════════════════════════════════════════
+
+  'battle-16': {
+    elements: [
+      { name: '몸통 3구 분해', desc: '아래-중간-위 구 3개로 분해', weight: 10, category: 'structure' },
+      { name: '얼굴 부분 분해', desc: '코·눈·모자 등 얼굴 요소 분해', weight: 15, category: 'structure' },
+      { name: '수직 쌓임', desc: '세로로 쌓임/아래→위', weight: 10, category: 'spatial' },
+      { name: '눈·코·모자 위치', desc: '머리 위에 모자, 정면에 눈/코', weight: 10, category: 'spatial' },
+      { name: '코 앞으로 돌출', desc: '코가 앞쪽으로 튀어나옴', weight: 5, category: 'spatial' },
+      { name: '아래→위 크기 감소', desc: '아래 큰 구, 위 작은 구 순', weight: 15, category: 'proportion' },
+      { name: '코·눈·모자 크기', desc: '작은 코/눈/모자 비율 언급', weight: 5, category: 'proportion' },
+      { name: '구·원뿔·원기둥', desc: '구/원뿔/원기둥 조합', weight: 10, category: 'shape' },
+      { name: '색상(흰/주황/검)', desc: '몸통 흰, 코 주황, 눈·모자 검', weight: 5, category: 'color' },
+    ],
+    ct: { focus: '분해+추상화', maxPoints: 15,
+      criteria: '눈사람을 기본 도형으로 분해하고 각 부분의 위치·크기·색을 독립적으로 서술하는 능력' },
+    anchors: [
+      { score: 93, prompt: '흰색 구 3개가 아래부터 큰-중간-작은 순서로 쌓여 있다. 가장 위 구 앞쪽에 주황색 작은 원뿔이 코처럼 돌출되어 있고, 코 위쪽에 검은 작은 구 2개가 눈이다. 머리 꼭대기에 검은 원기둥이 모자처럼 얹혀 있다.' },
+      { score: 50, prompt: '흰 공 3개가 쌓여있고 코랑 모자가 있다' },
+      { score: 20, prompt: '눈사람' },
+    ],
+  },
+
+  'battle-17': {
+    elements: [
+      { name: '본체·불·기둥 분해', desc: '본체, 불, 기둥 세 부분 구분', weight: 12, category: 'structure' },
+      { name: '3색 불 순서 규칙', desc: '위→아래 빨·노·초 순서', weight: 15, category: 'structure' },
+      { name: '불 3개 세로 배열', desc: '세 구가 세로로 나란히', weight: 12, category: 'spatial' },
+      { name: '본체 앞면/내부에 불', desc: '본체 앞/안쪽에 불이 박힘', weight: 8, category: 'spatial' },
+      { name: '기둥 아래 받침', desc: '본체 아래 기둥이 받침', weight: 5, category: 'spatial' },
+      { name: '본체 세로 긺', desc: '본체가 세로로 긺', weight: 7, category: 'proportion' },
+      { name: '불 크기 비율', desc: '불이 본체보다 작은', weight: 3, category: 'proportion' },
+      { name: '상자·구·기둥 구분', desc: '상자/구/원기둥 명명', weight: 10, category: 'shape' },
+      { name: '검·빨·노·초 색상', desc: '네 색 모두 언급', weight: 13, category: 'color' },
+    ],
+    ct: { focus: '분해+추상화', maxPoints: 15,
+      criteria: '신호등을 본체, 불, 기둥으로 분해하고 내부/외부 공간 관계를 서술하는 능력' },
+    anchors: [
+      { score: 92, prompt: '검은 세로 직사각형 상자가 본체이다. 본체 앞면에 위에서부터 빨간, 노란, 초록 구가 세로로 나란히 있다. 본체 아래에 회색 원기둥이 기둥으로 서 있다.' },
+      { score: 50, prompt: '검은 상자 안에 빨강 노랑 초록 불이 있다' },
+      { score: 20, prompt: '신호등' },
+    ],
+  },
+
+  'battle-18': {
+    elements: [
+      { name: '건물 5개 분해', desc: '5개 건물을 개별적으로 묘사', weight: 8, category: 'structure' },
+      { name: '각 건물 개별 속성 규칙', desc: '각각 높이·너비·색이 다르다는 규칙', weight: 15, category: 'structure' },
+      { name: '나란히 일렬 배치', desc: '옆으로 나란히/일렬로', weight: 10, category: 'spatial' },
+      { name: '바닥 정렬', desc: '바닥에 서 있는/아래 기준', weight: 5, category: 'spatial' },
+      { name: '높이 모두 다름', desc: '높이가 다른/높낮이 다양', weight: 15, category: 'proportion' },
+      { name: '너비 다름', desc: '너비/두께가 다른', weight: 10, category: 'proportion' },
+      { name: '상자 도형', desc: '상자/직육면체', weight: 7, category: 'shape' },
+      { name: '색상 2종 이상', desc: '여러 색상 사용', weight: 8, category: 'color' },
+      { name: '구체적 색상', desc: '파랑/청록/회색/흰/주황 등 명시', weight: 7, category: 'color' },
+    ],
+    ct: { focus: '분해+추상화', maxPoints: 15,
+      criteria: '유사하지만 다른 5개 건물의 차이점(높이, 너비, 색상)을 비교하며 체계적으로 서술하는 능력' },
+    anchors: [
+      { score: 92, prompt: '상자 5개가 옆으로 나란히 서 있다. 왼쪽부터: 파란색 좁고 중간 높이, 청록색 좁고 높은, 회색 넓고 중간, 흰색 가장 좁고 가장 높은, 주황색 넓고 가장 낮은 건물이다.' },
+      { score: 50, prompt: '높이가 다른 상자 여러 개가 나란히 있다' },
+      { score: 20, prompt: '건물들' },
+    ],
+  },
+
+  'battle-19': {
+    elements: [
+      { name: '받침·막대·추 분해', desc: '받침, 막대, 추 세 부분 구분', weight: 12, category: 'structure' },
+      { name: '비대칭 구조 규칙', desc: '좌우가 다른 비대칭 저울이라는 규칙', weight: 10, category: 'structure' },
+      { name: '받침 위에 막대', desc: '받침 위에 막대가 걸침', weight: 10, category: 'spatial' },
+      { name: '막대 양 끝에 추', desc: '막대 양쪽 끝에 추 매달림', weight: 10, category: 'spatial' },
+      { name: '수평 막대', desc: '막대가 수평으로 걸침', weight: 5, category: 'spatial' },
+      { name: '추 한쪽이 더 큼', desc: '한 추가 다른 추보다 크다', weight: 15, category: 'proportion' },
+      { name: '받침·막대 비율', desc: '받침 크기와 막대 길이 비교', weight: 5, category: 'proportion' },
+      { name: '원뿔·원기둥·구 구분', desc: '받침 원뿔, 막대 원기둥, 추 구', weight: 10, category: 'shape' },
+      { name: '색상 2종 이상', desc: '여러 색상 사용', weight: 8, category: 'color' },
+    ],
+    ct: { focus: '분해+추상화', maxPoints: 15,
+      criteria: '저울을 받침+막대+추로 분해하고, 비대칭 구조의 공간 관계를 서술하는 능력' },
+    anchors: [
+      { score: 92, prompt: '가운데에 노란 원뿔이 꼭짓점을 위로 하고 서 있다. 그 위에 회색 원기둥이 수평으로 걸쳐 있다. 막대 왼쪽 끝에 큰 빨간 구, 오른쪽 끝에 작은 파란 구가 달려 있다.' },
+      { score: 50, prompt: '삼각형 위에 막대가 있고 양쪽에 공이 있다' },
+      { score: 20, prompt: '저울' },
+    ],
+  },
+
+  // ═══════════════════════════════════════════════════════════
+  // Level 5: 극한 도전 — 분해+패턴+비율 복합
+  // ═══════════════════════════════════════════════════════════
+
+  'battle-20': {
+    elements: [
+      { name: '줄기·꽃잎·꽃술 분해', desc: '세 부분을 개별적으로 묘사', weight: 12, category: 'structure' },
+      { name: '꽃잎 원형 배치 규칙', desc: '꽃잎이 방사형/원형 배치', weight: 15, category: 'structure' },
+      { name: '꽃잎 5개 규칙', desc: '5개/다섯 장의 꽃잎', weight: 8, category: 'structure' },
+      { name: '줄기 수직', desc: '줄기가 세로로 서 있다', weight: 5, category: 'spatial' },
+      { name: '꽃이 줄기 위', desc: '줄기 꼭대기/위에 꽃', weight: 5, category: 'spatial' },
+      { name: '꽃술이 꽃잎 중심', desc: '꽃술이 꽃잎 가운데', weight: 5, category: 'spatial' },
+      { name: '줄기 가늘기', desc: '가느다란 줄기', weight: 5, category: 'proportion' },
+      { name: '꽃잎 납작', desc: '납작한/얇은 꽃잎', weight: 5, category: 'proportion' },
+      { name: '꽃술 작음', desc: '작은 꽃술', weight: 5, category: 'proportion' },
+      { name: '원기둥·타원·구 구분', desc: '세 도형 조합', weight: 10, category: 'shape' },
+      { name: '초록·자홍·노랑', desc: '세 색 모두 언급', weight: 10, category: 'color' },
+    ],
+    ct: { focus: '분해+패턴', maxPoints: 15,
+      criteria: '꽃을 줄기·꽃잎·꽃술로 분해하고, 꽃잎의 원형 배치 패턴을 인식하여 서술하는 능력' },
+    anchors: [
+      { score: 92, prompt: '초록색 가느다란 원기둥이 줄기로 세로로 서 있다. 줄기 꼭대기에 자홍색 납작한 타원체 5개가 원형으로 배치되어 꽃잎을 이룬다. 꽃잎 중심에 노란색 작은 구가 꽃술이다.' },
+      { score: 50, prompt: '초록 줄기 위에 분홍 꽃잎과 노란 가운데' },
+      { score: 20, prompt: '꽃' },
+    ],
+  },
+
+  'battle-21': {
+    elements: [
+      { name: '머리·눈·입·안테나 분해', desc: '4 부분을 개별적으로 묘사', weight: 15, category: 'structure' },
+      { name: '좌우 대칭 규칙', desc: '눈/안테나 등이 좌우 대칭', weight: 12, category: 'structure' },
+      { name: '눈이 머리 앞면 상단', desc: '눈이 앞쪽 위에 좌우로', weight: 8, category: 'spatial' },
+      { name: '입이 눈 아래', desc: '입이 눈보다 아래/정면 하단', weight: 5, category: 'spatial' },
+      { name: '안테나 머리 위 양쪽', desc: '머리 위 양옆에 안테나', weight: 10, category: 'spatial' },
+      { name: '눈·입 작음', desc: '눈/입이 머리에 비해 작음', weight: 5, category: 'proportion' },
+      { name: '머리 큼', desc: '머리가 제일 큼', weight: 5, category: 'proportion' },
+      { name: '상자·구·원기둥 조합', desc: '머리 상자, 눈 구, 안테나 원기둥', weight: 10, category: 'shape' },
+      { name: '안테나 2개 + 끝 장식', desc: '안테나 2개와 끝 장식 언급', weight: 5, category: 'shape' },
+      { name: '색상(머리/눈/입)', desc: '세 부분 색상 최소 2색 이상', weight: 10, category: 'color' },
+    ],
+    ct: { focus: '분해+추상화', maxPoints: 15,
+      criteria: '얼굴을 머리/눈/입/안테나로 분해하고 좌우 대칭 구조와 앞뒤 관계를 서술하는 능력' },
+    anchors: [
+      { score: 92, prompt: '큰 회색 상자가 머리이다. 머리 앞면 위쪽에 노란 구 2개가 좌우로 눈이다. 눈 아래에 빨간 납작한 작은 상자가 입이다. 머리 위 양쪽에 회색 원기둥 2개가 안테나로 올라가고, 각 끝에 빨간 작은 구가 달려있다.' },
+      { score: 50, prompt: '네모 머리에 눈 2개, 안테나가 있다' },
+      { score: 20, prompt: '로봇 얼굴' },
+    ],
+  },
+
+  'battle-22': {
+    elements: [
+      { name: '중심·결합봉·말단 분해', desc: '중심 구/결합봉/말단 구 세 역할 구분', weight: 15, category: 'structure' },
+      { name: '3방향 결합 규칙', desc: '세 방향으로 뻗는 규칙', weight: 15, category: 'structure' },
+      { name: '3D 방향성', desc: '위/아래/앞/옆 등 3차원 방향', weight: 10, category: 'structure' },
+      { name: '각 결합봉 방향', desc: '각 봉이 향하는 방향 구체화', weight: 10, category: 'spatial' },
+      { name: '말단 구가 봉 끝', desc: '작은 구가 봉 끝에 부착', weight: 5, category: 'spatial' },
+      { name: '중심 > 말단 크기', desc: '중심 구가 말단보다 크다', weight: 10, category: 'proportion' },
+      { name: '구·원기둥 구분', desc: '구와 원기둥(봉) 구분', weight: 8, category: 'shape' },
+      { name: '색상(빨·회·파)', desc: '중심·봉·말단 색상 차이', weight: 12, category: 'color' },
+    ],
+    ct: { focus: '분해+추상화', maxPoints: 15,
+      criteria: '분자 모형의 중심-결합-말단 구조를 분해하고, 3차원 방향성을 서술하는 능력' },
+    anchors: [
+      { score: 92, prompt: '큰 빨간 구가 중심에 있다. 중심에서 세 방향으로 가느다란 회색 원기둥이 결합봉처럼 뻗어 있다. 하나는 오른쪽 위, 하나는 왼쪽 위, 하나는 아래 뒤쪽을 향한다. 각 봉 끝에 파란색 작은 구가 달려 있다.' },
+      { score: 50, prompt: '큰 빨간 공에서 막대가 여러 방향으로 나와서 끝에 작은 공이 있다' },
+      { score: 20, prompt: '분자 모형' },
+    ],
+  },
+
+  'battle-23': {
+    elements: [
+      { name: '기둥·지붕·좌석 분해', desc: '세 역할로 구분해서 설명', weight: 12, category: 'structure' },
+      { name: '좌석 원형 배치', desc: '좌석이 원형으로/둘레에 배치', weight: 15, category: 'structure' },
+      { name: '좌석 개수·균등 간격', desc: '6개/8개 등 개수 + 등간격', weight: 10, category: 'structure' },
+      { name: '기둥 위에 지붕', desc: '기둥 위에 지붕 덮임', weight: 8, category: 'spatial' },
+      { name: '기둥 주위에 좌석', desc: '좌석이 기둥을 둘러쌈', weight: 10, category: 'spatial' },
+      { name: '지붕 덮는 크기', desc: '지붕이 좌석들을 덮을 만큼 넓음', weight: 5, category: 'proportion' },
+      { name: '좌석 작음', desc: '좌석이 기둥보다 작음', weight: 5, category: 'proportion' },
+      { name: '원기둥·원뿔·구 구분', desc: '세 도형 조합', weight: 10, category: 'shape' },
+      { name: '색상 2종 이상', desc: '여러 색상 사용', weight: 10, category: 'color' },
+    ],
+    ct: { focus: '분해+패턴', maxPoints: 15,
+      criteria: '회전목마를 중심기둥/지붕/좌석으로 분해하고, 좌석의 원형 배치 패턴을 인식하여 서술하는 능력' },
+    anchors: [
+      { score: 92, prompt: '가운데에 노란 원기둥이 세로로 서 있다. 원기둥 위에 빨간 원뿔이 지붕처럼 얹혀 있다. 기둥 주위에 파란 작은 구 8개가 원형으로 같은 간격으로 배치되어 좌석이다.' },
+      { score: 50, prompt: '기둥 위에 지붕이 있고 주변에 공이 돈다' },
+      { score: 20, prompt: '회전목마' },
+    ],
+  },
+}

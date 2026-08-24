@@ -3,7 +3,6 @@ import { BATTLE_CHALLENGES } from '../../data/challenges-battle.js'
 import VPythonRunner from '../shared/VPythonRunner.jsx'
 import { generateCode, evaluatePrompt } from '../../utils/claude.js'
 
-const LS_API_KEY = 'vpython_api_key'
 
 const sections = [
   { id: 'overview', icon: '🌍', label: '서비스 소개' },
@@ -155,7 +154,7 @@ function OverviewSection() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '12px', marginBottom: '28px' }}>
         <StatCard emoji="👥" label="대상" value="고1 정보" />
         <StatCard emoji="🤝" label="팀 구성" value="2인 1팀" />
-        <StatCard emoji="📱" label="최대 팀 수" value="15팀" />
+        <StatCard emoji="📱" label="최대 팀 수" value="40팀" />
         <StatCard emoji="⏱️" label="수업 시간" value="100분" />
       </div>
 
@@ -191,8 +190,6 @@ function OverviewSection() {
 }
 
 function TryItSection() {
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem(LS_API_KEY) || '')
-  const [keySaved, setKeySaved] = useState(() => !!localStorage.getItem(LS_API_KEY))
   const [selected, setSelected] = useState(0)
   const [prompt, setPrompt] = useState('')
   const [resultCode, setResultCode] = useState(null)
@@ -203,15 +200,8 @@ function TryItSection() {
 
   const challenge = PRACTICE_CHALLENGES[selected]
 
-  const saveKey = () => {
-    if (!apiKey.trim()) return
-    localStorage.setItem(LS_API_KEY, apiKey.trim())
-    setKeySaved(true)
-  }
-
   const handleSubmit = async () => {
     if (!prompt.trim()) return
-    if (!keySaved) return setError('API 키를 먼저 저장해주세요.')
     setLoading(true)
     setLoadingStep('3D 장면 생성 중...')
     setError(null)
@@ -243,50 +233,6 @@ function TryItSection() {
         학생들이 수업에서 경험할 활동을 직접 체험해보세요.
         아래 연습 문제는 실제 수업에서 사용되는 문제와 다르지만, 난이도와 형식은 동일합니다.
       </p>
-
-      {/* API 키 입력 */}
-      <Card>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
-          <span style={{ fontSize: '1.25rem' }}>🔑</span>
-          <span style={{ fontWeight: 600, fontSize: '0.9375rem', color: '#1e293b' }}>Anthropic API 키</span>
-          {keySaved && <span style={{ fontSize: '0.75rem', color: '#22c55e', fontWeight: 600 }}>저장됨</span>}
-        </div>
-        <p style={{ fontSize: '0.8125rem', color: '#94a3b8', marginBottom: '10px' }}>
-          여기서 입력한 API 키는 수업 시작 시에도 자동으로 사용됩니다.
-        </p>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <input
-            type="password"
-            value={apiKey}
-            onChange={e => { setApiKey(e.target.value); setKeySaved(false) }}
-            placeholder="sk-ant-..."
-            style={{
-              flex: 1,
-              padding: '8px 12px',
-              border: '1px solid #e2e8f0',
-              borderRadius: '8px',
-              fontSize: '0.875rem',
-              fontFamily: 'monospace',
-              outline: 'none',
-            }}
-          />
-          <button
-            onClick={saveKey}
-            style={{
-              padding: '8px 20px',
-              background: keySaved ? '#22c55e' : '#6366f1',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              fontSize: '0.875rem',
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
-          >
-            {keySaved ? '저장됨' : '저장'}
-          </button>
-        </div>
-      </Card>
 
       {/* 레벨 선택 탭 */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
@@ -632,7 +578,8 @@ function HowtoSection() {
           <li>팀 이름과 색상은 자동 생성됩니다. (예: "용감한 펭귄")</li>
         </ol>
         <InfoBox>
-          15팀을 초과하면 관람 모드로 자동 전환됩니다.
+          팀 정원(기본 40팀)을 초과하면 "정원 초과" 안내와 함께 관람 모드로 전환됩니다.
+          정원은 서버의 MAX_TEAMS 환경변수로 조정할 수 있습니다.
           기기가 부족한 경우 한 팀이 1대의 기기로 진행할 수 있습니다.
         </InfoBox>
       </StepCard>
@@ -787,7 +734,7 @@ function TipsSection() {
           <TroubleshootItem icon="📶" problem="학교 WiFi 차단" solution="교사 핫스팟으로 전환" />
           <TroubleshootItem icon="📱" problem="QR 스캔 불가" solution="칠판에 IP 직접 기재" />
           <TroubleshootItem icon="🔋" problem="학생 기기 없음" solution="팀 1대로 통합 진행" />
-          <TroubleshootItem icon="👥" problem="15팀 초과" solution="자동으로 관람 모드 전환" />
+          <TroubleshootItem icon="👥" problem="팀 정원(40팀) 초과" solution="학생 화면에 정원 초과 안내가 뜨고 관람 모드로 전환됩니다" />
           <TroubleshootItem icon="🕐" problem="중간에 입장한 학생" solution="현재 진행 중인 챌린지가 자동 전달됩니다" />
           <TroubleshootItem icon="📊" problem="미제출 팀 점수" solution="제출하지 않은 팀은 자동 0점 처리됩니다" />
         </div>
@@ -903,7 +850,7 @@ function FAQSection() {
     },
     {
       q: 'API 비용은 얼마나 드나요?',
-      a: '1회 수업(15팀 × 평균 10회 제출) 기준 약 $1~2 정도입니다.',
+      a: '1회 수업(14팀 × 평균 10회 제출) 기준 약 $1~2 정도입니다. 팀 수에 비례해 늘어납니다.',
     },
     {
       q: '인터넷 없이 사용할 수 있나요?',

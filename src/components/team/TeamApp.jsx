@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import { createSocket } from '../../utils/socket.js'
 import useSessionStore from '../../store/sessionStore.js'
 import useTeamStore from '../../store/teamStore.js'
 import BattleMode from './BattleMode.jsx'
 import ChatPanel from '../shared/ChatPanel.jsx'
+import { setTeamToken, teamFetch } from '../../utils/teamAuth.js'
 
 const WELCOME_MESSAGES = [
   '오늘의 챌린지를 정복해보세요!',
@@ -16,6 +17,8 @@ const WELCOME_MESSAGES = [
 
 export default function TeamApp() {
   const { teamId } = useParams()
+  const navigate = useNavigate()
+  const location = useLocation()
   const socketRef = useRef(null)
   const { setChallenge } = useSessionStore()
   const { myTeam, setMyTeam } = useTeamStore()
@@ -23,14 +26,42 @@ export default function TeamApp() {
   const [rankings, setRankings] = useState(null)
   const [challengeEnded, setChallengeEnded] = useState(false)
   const [showWelcome, setShowWelcome] = useState(true)
+  const [sessionEnded, setSessionEnded] = useState(false)
 
-  // 팀 정보 로드
+  // 타이머
+  const [remainingSeconds, setRemainingSeconds] = useState(null)
+  const timerStartRef = useRef(null)
+  const timerIntervalRef = useRef(null)
+
+  // 최종 결과
+  const [finalResults, setFinalResults] = useState(null)
+
+  // 현재 라운드 식별자 — 같은 챌린지를 다시 시작해도 새 라운드로 구분된다
+  const [roundStartedAt, setRoundStartedAt] = useState(null)
+
+  // 팀 정보 로드 + 세션 상태 확인
   useEffect(() => {
+    const token = new URLSearchParams(location.search).get('token')
+    if (token) {
+      setTeamToken(teamId, token)
+      navigate(`/team/${teamId}`, { replace: true })
+      return
+    }
+
     const init = async () => {
       try {
-        const res = await fetch(`/api/team/${teamId}`)
+        const res = await teamFetch(`/api/team/${teamId}`, teamId)
         if (res.ok) {
           const team = await res.json()
+          // 세션 상태 확인 — ended면 /join으로 리다이렉트
+          const sessionRes = await fetch(`/api/session/${team.session_id}`)
+          if (sessionRes.ok) {
+            const session = await sessionRes.json()
+            if (session.status === 'ended') {
+              navigate('/join', { replace: true })
+              return
+            }
+          }
           setMyTeam(team)
         }
       } catch (e) {
@@ -39,7 +70,42 @@ export default function TeamApp() {
       setLoading(false)
     }
     init()
-  }, [teamId])
+  }, [teamId, location.search])
+
+  // 타이머 시작
+  const startCountdown = (seconds) => {
+    if (timerIntervalRef.current) clearInterval(timerIntervalRef.current)
+    if (!seconds || seconds <= 0) {
+      setRemainingSeconds(null)
+      return
+    }
+    const startedAt = Date.now()
+    timerStartRef.current = { startedAt, timeLimit: seconds }
+    setRemainingSeconds(seconds)
+
+    timerIntervalRef.current = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - startedAt) / 1000)
+      const remaining = Math.max(0, seconds - elapsed)
+      setRemainingSeconds(remaining)
+      if (remaining <= 0) {
+        clearInterval(timerIntervalRef.current)
+        timerIntervalRef.current = null
+      }
+    }, 1000)
+  }
+
+  const stopCountdown = () => {
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current)
+      timerIntervalRef.current = null
+    }
+    setRemainingSeconds(null)
+    timerStartRef.current = null
+  }
+
+  useEffect(() => {
+    return () => stopCountdown()
+  }, [])
 
   // Socket.io 연결
   useEffect(() => {
@@ -50,9 +116,12 @@ export default function TeamApp() {
 
     socket.emit('team:join', { sessionId: myTeam.session_id, teamId: myTeam.id })
 
-    socket.on('challenge:started', ({ challengeId }) => {
+    socket.on('challenge:started', ({ challengeId, timeLimit, startedAt }) => {
       setChallengeEnded(false)
       setRankings(null)
+      setFinalResults(null)
+      setRoundStartedAt(startedAt ?? null)
+      startCountdown(timeLimit)
       fetch(`/api/challenges/${challengeId}`)
         .then((r) => r.json())
         .then(setChallenge)
@@ -61,10 +130,21 @@ export default function TeamApp() {
 
     socket.on('challenge:ended', () => {
       setChallengeEnded(true)
+      stopCountdown()
     })
 
     socket.on('result:revealed', ({ rankings }) => {
       setRankings(rankings)
+    })
+
+    socket.on('session:final-ended', ({ rankings, challengeCount }) => {
+      setFinalResults({ rankings, challengeCount })
+      stopCountdown()
+    })
+
+    // 세션 종료 시 일정 시간 후 /join으로 리다이렉트
+    socket.on('session:ended', () => {
+      setSessionEnded(true)
     })
 
     return () => socket.disconnect()
@@ -193,7 +273,15 @@ export default function TeamApp() {
       </header>
 
       <main>
-        <BattleMode team={myTeam} socket={socketRef} rankings={rankings} challengeEnded={challengeEnded} />
+        <BattleMode
+          team={myTeam}
+          socket={socketRef}
+          rankings={rankings}
+          challengeEnded={challengeEnded}
+          remainingSeconds={remainingSeconds}
+          finalResults={finalResults}
+          roundStartedAt={roundStartedAt}
+        />
       </main>
 
       {/* 채팅 패널 */}

@@ -5,3 +5,10 @@ db/*.db-shm
 db/*.db-wal
 .env
 .git
+.DS_Store
+.claude
+DEV_LOG.md
+tests
+*.pdf
+VPython_*피드백리포트.html
+generate_feedback_*.py

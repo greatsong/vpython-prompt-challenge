@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { teacherFetch } from '../../utils/teacherAuth.js'
 
 /**
  * QRDisplay
@@ -14,7 +15,7 @@ export default function QRDisplay({ sessionId, teams, onEnterClass }) {
       // 팀별 QR 생성
       const entries = await Promise.all(
         teams.map(async (team) => {
-          const res = await fetch(`/api/session/${sessionId}/qr?teamId=${team.id}`)
+          const res = await teacherFetch(`/api/session/${sessionId}/qr?teamId=${team.id}`)
           const { qr } = await res.json()
           return [team.id, qr]
         })

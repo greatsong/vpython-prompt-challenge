@@ -1,16 +1,27 @@
 /**
  * Session 1 & 5 — 프롬프트 배틀 챌린지 뱅크
- * Level 1~3 (프롬프트 정확도가 점수에 직접 반영)
+ * Level 1~5 (프롬프트 정확도가 점수에 직접 반영)
  * glow.js JavaScript API 형식
  *
  * 교육 설계 원칙:
- *   Level 1 — 생소한 도형 1개를 정밀하게 묘사 (추상화 훈련)
- *   Level 2 — 현실 사물을 기본 도형으로 분해·재조합 (분해 훈련)
- *   Level 3 — 반복·규칙이 담긴 장면을 패턴으로 기술 (알고리즘 훈련)
+ *   Level 1 — 도형 1개를 정밀하게 묘사 (추상화 훈련) + shapes 힌트 제공
+ *   Level 2 — 현실 사물을 도형으로 분해 (분해 훈련) + 간략 설명만
+ *   Level 3 — 반복·규칙 장면을 패턴으로 기술 (알고리즘 훈련) + 간략 설명만
+ *   Level 4 — 복합 구조, 힌트 없이 3D 뷰만 보고 (분해+추상화 심화)
+ *   Level 5 — 극한 도전, 힌트 없이 복합 구조+패턴 (종합)
+ *
+ * shapes 필드:
+ *   Level 1 — 도형 종류 + 개수 제공 (워밍업)
+ *   Level 2~5 — null (학생이 스스로 파악해야 함)
+ *
+ * description 필드:
+ *   Level 1 — 상세 설명 (가이드)
+ *   Level 2~3 — 간략 설명 (방향만 제시)
+ *   Level 4~5 — null (3D 뷰만 보고 파악)
  */
 
 export const BATTLE_CHALLENGES = [
-  // ─── Level 1: 정밀 묘사 — 도형 하나, 그러나 방향·비율·형태가 핵심 ──────────
+  // ─── Level 1: 정밀 묘사 — 도형 하나, shapes 힌트 제공 ─────────────────
   {
     id: 'battle-01',
     level: 1,
@@ -45,64 +56,64 @@ export const BATTLE_CHALLENGES = [
     hint: '화살표가 어디에서 시작해서 어느 방향으로 뻗어 있는지, 색상은 무엇인지 정확히 묘사하세요',
   },
 
-  // ─── Level 2: 분해와 재조합 — 현실 사물을 도형으로 해체하기 ─────────────────
+  // ─── Level 2: 분해와 재조합 — shapes 힌트 없음, 간략 설명만 ────────────
   {
     id: 'battle-04',
     level: 2,
     emoji: '🍄',
     title: '버섯',
-    description: '가느다란 흰 줄기 위에 넓고 납작한 빨간 갓이 얹혀 있다',
-    shapes: ['원기둥(cylinder) ×1', '타원체(ellipsoid) ×1'],
+    description: '버섯 한 송이',
+    shapes: null,
     code: `cylinder({pos: vec(0,-2,0), axis: vec(0,2.5,0), radius: 0.35, color: color.white});
 ellipsoid({pos: vec(0,0.8,0), size: vec(2.5,0.8,2.5), color: color.red});`,
     ct: ['분해'],
-    hint: '줄기(아래)와 갓(위)을 각각 어떤 모양으로, 어떤 비율로 표현할지 생각해보세요',
+    hint: '줄기와 갓을 각각 어떤 도형으로 표현할지 생각해보세요',
   },
   {
     id: 'battle-05',
     level: 2,
     emoji: '⏳',
     title: '모래시계',
-    description: '위아래 두 원뿔이 꼭짓점끼리 맞닿아 있고, 가운데에 작은 노란 구가 있다',
-    shapes: ['원뿔(cone) ×2', '구(sphere) ×1'],
+    description: '모래시계',
+    shapes: null,
     code: `cone({pos: vec(0,2.5,0), axis: vec(0,-2.5,0), radius: 1.5, color: color.cyan});
 cone({pos: vec(0,-2.5,0), axis: vec(0,2.5,0), radius: 1.5, color: color.cyan});
 sphere({pos: vec(0,0,0), radius: 0.3, color: color.yellow});`,
     ct: ['분해', '추상화'],
-    hint: '넓은 부분이 위/아래에 있고 좁은 부분이 가운데서 만납니다. 원뿔의 방향이 핵심!',
+    hint: '넓은 부분과 좁은 부분의 방향을 잘 관찰하세요',
   },
   {
     id: 'battle-06',
     level: 2,
     emoji: '🪐',
     title: '토성',
-    description: '노란 행성(구) 주위를 주황색 고리가 수평으로 감싸고 있다',
-    shapes: ['구(sphere) ×1', '고리(ring) ×1'],
+    description: '행성 하나',
+    shapes: null,
     code: `sphere({pos: vec(0,0,0), radius: 1.5, color: color.yellow});
 ring({pos: vec(0,0,0), axis: vec(0,1,0), radius: 2.8, thickness: 0.15, color: color.orange});`,
     ct: ['분해'],
-    hint: '행성 본체와 고리를 따로 묘사하세요. 고리의 방향(수평)과 행성 대비 크기 비율이 중요합니다',
+    hint: '본체와 그 주위의 것을 따로 묘사하세요',
   },
   {
     id: 'battle-07',
     level: 2,
     emoji: '🚀',
     title: '로켓',
-    description: '파란 원기둥 동체 위에 빨간 원뿔 머리, 아래에 주황색 원뿔 배기화염',
-    shapes: ['원기둥(cylinder) ×1', '원뿔(cone) ×2'],
+    description: '서 있는 로켓',
+    shapes: null,
     code: `cylinder({pos: vec(0,-1,0), axis: vec(0,3,0), radius: 0.7, color: color.blue});
 cone({pos: vec(0,2,0), axis: vec(0,1.5,0), radius: 0.7, color: color.red});
 cone({pos: vec(0,-1,0), axis: vec(0,-1.2,0), radius: 0.7, color: color.orange});`,
     ct: ['분해'],
-    hint: '로켓을 위-중간-아래 세 부분으로 나눠 각각의 도형, 색상, 방향을 설명하세요',
+    hint: '위-중간-아래 각 부분의 도형과 색상을 설명하세요',
   },
   {
     id: 'battle-08',
     level: 2,
     emoji: '🍎',
     title: '탁자 위 사과',
-    description: '갈색 탁자(납작한 상판 + 가느다란 다리 4개) 위에 빨간 사과(구)가 놓여 있다',
-    shapes: ['상자(box) ×1', '원기둥(cylinder) ×4', '구(sphere) ×1'],
+    description: '탁자 위에 과일이 놓여 있다',
+    shapes: null,
     code: `box({pos: vec(0,0,0), size: vec(4,0.3,3), color: vec(0.6,0.3,0.1)});
 cylinder({pos: vec(-1.5,-2,1), axis: vec(0,2,0), radius: 0.15, color: vec(0.6,0.3,0.1)});
 cylinder({pos: vec(1.5,-2,1), axis: vec(0,2,0), radius: 0.15, color: vec(0.6,0.3,0.1)});
@@ -110,45 +121,45 @@ cylinder({pos: vec(-1.5,-2,-1), axis: vec(0,2,0), radius: 0.15, color: vec(0.6,0
 cylinder({pos: vec(1.5,-2,-1), axis: vec(0,2,0), radius: 0.15, color: vec(0.6,0.3,0.1)});
 sphere({pos: vec(0,0.55,0), radius: 0.4, color: color.red});`,
     ct: ['분해', '추상화'],
-    hint: '탁자를 "상판"과 "다리 4개"로 나누고, 그 위의 사과까지 — 총 세 종류의 부품을 각각 설명하세요',
+    hint: '탁자를 부품별로 나눠서 각각 설명하세요',
   },
 
-  // ─── Level 3: 반복 패턴 — "하나를 설명하고, 규칙을 말하라" ──────────────────
+  // ─── Level 3: 반복 패턴 — shapes 힌트 없음, 간략 설명만 ────────────────
   {
     id: 'battle-09',
     level: 3,
     emoji: '🪜',
     title: '계단',
-    description: '왼쪽 아래에서 오른쪽 위로 올라가는 빨간 계단 6칸',
-    shapes: ['상자(box)'],
+    description: '올라가는 계단',
+    shapes: null,
     code: `for (var i = 0; i < 6; i++) {
     box({pos: vec(i*1.2-3, i*0.6-1.5, 0), size: vec(1, 0.5, 2), color: color.red});
 }`,
     ct: ['패턴인식', '알고리즘'],
-    hint: '계단 한 칸의 모양을 먼저 묘사한 뒤, 총 몇 칸이 어떤 규칙으로 올라가는지 설명하세요',
+    hint: '한 칸의 모양과, 전체가 어떤 규칙으로 이어지는지 설명하세요',
   },
   {
     id: 'battle-10',
     level: 3,
     emoji: '🏟️',
     title: '원형 울타리',
-    description: '노란 기둥 12개가 원을 그리며 균등하게 세워져 있다',
-    shapes: ['원기둥(cylinder)'],
+    description: '울타리',
+    shapes: null,
     code: `for (var i = 0; i < 12; i++) {
     var angle = i * Math.PI * 2 / 12;
     cylinder({pos: vec(Math.cos(angle)*3, -1, Math.sin(angle)*3),
               axis: vec(0,2,0), radius: 0.15, color: color.yellow});
 }`,
     ct: ['패턴인식', '알고리즘'],
-    hint: '기둥 하나의 생김새를 설명한 뒤, 전체 배치 패턴(원형, 개수, 간격)을 설명하세요',
+    hint: '기둥 하나의 생김새와 전체 배치 패턴을 설명하세요',
   },
   {
     id: 'battle-11',
     level: 3,
     emoji: '🔺',
     title: '블록 피라미드',
-    description: '아래층 주황 3개, 중간층 청록 2개, 꼭대기 자홍 1개 — 블록이 피라미드 형태로 쌓여 있다',
-    shapes: ['상자(box)'],
+    description: '블록으로 쌓은 피라미드',
+    shapes: null,
     code: `var rowColors = [color.orange, color.cyan, color.magenta];
 for (var row = 0; row < 3; row++) {
     var count = 3 - row;
@@ -158,15 +169,15 @@ for (var row = 0; row < 3; row++) {
     }
 }`,
     ct: ['패턴인식', '알고리즘', '분해'],
-    hint: '각 층에 블록이 몇 개인지, 어떤 색인지, 위로 갈수록 어떤 규칙으로 줄어드는지 설명하세요',
+    hint: '각 층의 블록 수, 색상, 배치 규칙을 설명하세요',
   },
   {
     id: 'battle-12',
     level: 3,
     emoji: '♟️',
     title: '체스판',
-    description: '4×4 격자로 된 납작한 판 — 흰색과 검은색이 번갈아 배치된다',
-    shapes: ['상자(box)'],
+    description: '체스판',
+    shapes: null,
     code: `for (var row = 0; row < 4; row++) {
     for (var col = 0; col < 4; col++) {
         var c = (row + col) % 2 === 0 ? color.white : color.black;
@@ -174,17 +185,15 @@ for (var row = 0; row < 3; row++) {
     }
 }`,
     ct: ['알고리즘', '패턴인식'],
-    hint: '칸의 모양(납작한 정사각형), 전체 크기(4×4), 색상 배치 규칙(어떤 패턴으로 번갈아가는지)을 설명하세요',
+    hint: '칸의 크기와 전체 배치, 색상 배치 규칙을 설명하세요',
   },
-
-  // ─── Level 3+: 대규모 패턴 — 30개 이상, 패턴의 힘을 체감하기 ────────────────
   {
     id: 'battle-13',
     level: 3,
     emoji: '🌈',
     title: '구슬 커튼',
-    description: '6행 6열(36개)의 구가 격자로 배열되어 있다. 각 행이 무지개 색(빨-주-노-초-파-자홍) 순이다',
-    shapes: ['구(sphere)'],
+    description: '무지개색 구슬 커튼',
+    shapes: null,
     code: `var rowColors = [color.red, color.orange, color.yellow, color.green, color.blue, color.magenta];
 for (var row = 0; row < 6; row++) {
     for (var col = 0; col < 6; col++) {
@@ -192,30 +201,30 @@ for (var row = 0; row < 6; row++) {
     }
 }`,
     ct: ['패턴인식', '알고리즘'],
-    hint: '격자의 행×열 크기, 각 행의 색상 순서를 빠짐없이 나열하세요. 패턴을 발견하면 한 문장으로 줄일 수 있습니다',
+    hint: '배열의 크기와 각 줄의 색 순서를 설명하세요',
   },
   {
     id: 'battle-14',
     level: 3,
     emoji: '🌪️',
     title: '나선 탑',
-    description: '청록색 작은 구 30개가 나선형으로 올라가며 배치되어 있다',
-    shapes: ['구(sphere)'],
+    description: '나선형 탑',
+    shapes: null,
     code: `for (var i = 0; i < 30; i++) {
     var angle = i * Math.PI / 5;
     var y = i * 0.3 - 4.5;
     sphere({pos: vec(Math.cos(angle)*2, y, Math.sin(angle)*2), radius: 0.25, color: color.cyan});
 }`,
     ct: ['패턴인식', '알고리즘'],
-    hint: '구 하나하나를 나열하지 말고, "어떤 경로를 따라 배치되어 있는지" 전체 패턴을 설명하세요',
+    hint: '하나하나 나열하지 말고, 전체 경로의 패턴을 설명하세요',
   },
   {
     id: 'battle-15',
     level: 3,
     emoji: '🏛️',
     title: '3D 피라미드',
-    description: '주황색 정육면체가 피라미드 형태로 쌓여 있다 — 맨 아래 4×4, 그 위 3×3, 2×2, 꼭대기 1개 (총 30개)',
-    shapes: ['상자(box)'],
+    description: '입체 피라미드',
+    shapes: null,
     code: `for (var layer = 0; layer < 4; layer++) {
     var size = 4 - layer;
     for (var x = 0; x < size; x++) {
@@ -226,6 +235,140 @@ for (var row = 0; row < 6; row++) {
     }
 }`,
     ct: ['패턴인식', '알고리즘', '분해'],
-    hint: '각 층의 가로×세로 개수가 어떤 규칙으로 줄어드는지, 블록이 어떤 모양인지 설명하세요',
+    hint: '각 층의 가로x세로 개수가 어떤 규칙으로 줄어드는지 설명하세요',
+  },
+
+  // ─── Level 4: 복합 구조 — 힌트 없음, 3D 뷰만 ─────────────────────────
+  {
+    id: 'battle-16',
+    level: 4,
+    emoji: '⛄',
+    title: '눈사람',
+    description: null,
+    shapes: null,
+    code: `sphere({pos: vec(0,-2,0), radius: 1.5, color: color.white});
+sphere({pos: vec(0,0,0), radius: 1.1, color: color.white});
+sphere({pos: vec(0,1.7,0), radius: 0.8, color: color.white});
+cone({pos: vec(0,1.7,0), axis: vec(0,0,0.7), radius: 0.12, color: color.orange});
+sphere({pos: vec(-0.25,1.95,0.65), radius: 0.08, color: color.black});
+sphere({pos: vec(0.25,1.95,0.65), radius: 0.08, color: color.black});
+cylinder({pos: vec(0,2.35,0), axis: vec(0,0.6,0), radius: 0.55, color: color.black});`,
+    ct: ['분해', '추상화'],
+    hint: '전체를 부분별로 나누고, 각 부분의 도형/색/위치를 하나씩 설명하세요',
+  },
+  {
+    id: 'battle-17',
+    level: 4,
+    emoji: '🚦',
+    title: '신호등',
+    description: null,
+    shapes: null,
+    code: `box({pos: vec(0,0,0), size: vec(1.2,3.5,0.8), color: vec(0.15,0.15,0.15)});
+sphere({pos: vec(0,1,0.35), radius: 0.35, color: color.red});
+sphere({pos: vec(0,0,0.35), radius: 0.35, color: color.yellow});
+sphere({pos: vec(0,-1,0.35), radius: 0.35, color: color.green});
+cylinder({pos: vec(0,-3.5,0), axis: vec(0,1.75,0), radius: 0.12, color: vec(0.3,0.3,0.3)});`,
+    ct: ['분해', '추상화'],
+    hint: '전체를 구성 부품으로 나누고, 각 부품의 위치 관계를 설명하세요',
+  },
+  {
+    id: 'battle-18',
+    level: 4,
+    emoji: '🏙️',
+    title: '도시 스카이라인',
+    description: null,
+    shapes: null,
+    code: `box({pos: vec(-4,0,0), size: vec(1.5,4,1.5), color: color.blue});
+box({pos: vec(-2,1.5,0), size: vec(1.2,7,1.2), color: color.cyan});
+box({pos: vec(0,0.5,0), size: vec(1.8,5,1.8), color: vec(0.5,0.5,0.5)});
+box({pos: vec(2,2,0), size: vec(1,8,1), color: color.white});
+box({pos: vec(4,-0.5,0), size: vec(2,3,2), color: color.orange});`,
+    ct: ['분해', '추상화'],
+    hint: '각 건물의 높이, 너비, 색상을 비교하며 왼쪽부터 순서대로 설명하세요',
+  },
+  {
+    id: 'battle-19',
+    level: 4,
+    emoji: '⚖️',
+    title: '균형 저울',
+    description: null,
+    shapes: null,
+    code: `cone({pos: vec(0,-2,0), axis: vec(0,2,0), radius: 1, color: color.yellow});
+cylinder({pos: vec(0,0,0), axis: vec(4,0,0), radius: 0.1, color: vec(0.5,0.5,0.5)});
+cylinder({pos: vec(0,0,0), axis: vec(-4,0,0), radius: 0.1, color: vec(0.5,0.5,0.5)});
+sphere({pos: vec(4,0,0), radius: 0.6, color: color.red});
+sphere({pos: vec(-4,0,0), radius: 0.9, color: color.blue});`,
+    ct: ['분해', '추상화'],
+    hint: '받침, 막대, 양쪽 추를 각각 설명하세요. 좌우 차이에 주목하세요',
+  },
+
+  // ─── Level 5: 극한 도전 — 힌트 없음, 복합 구조 + 패턴 ─────────────────
+  {
+    id: 'battle-20',
+    level: 5,
+    emoji: '🌸',
+    title: '꽃',
+    description: null,
+    shapes: null,
+    code: `cylinder({pos: vec(0,-3,0), axis: vec(0,3,0), radius: 0.1, color: color.green});
+for (var i = 0; i < 5; i++) {
+    var a = i * Math.PI * 2 / 5;
+    ellipsoid({pos: vec(Math.cos(a)*0.8, 0.5+Math.sin(a)*0.3, Math.sin(a)*0.8),
+               size: vec(0.8, 0.3, 0.4), color: color.magenta});
+}
+sphere({pos: vec(0,0.5,0), radius: 0.3, color: color.yellow});`,
+    ct: ['분해', '패턴인식'],
+    hint: '줄기, 꽃잎, 꽃술을 각각 설명하세요. 꽃잎의 배치 패턴에 주목하세요',
+  },
+  {
+    id: 'battle-21',
+    level: 5,
+    emoji: '🤖',
+    title: '로봇 얼굴',
+    description: null,
+    shapes: null,
+    code: `box({pos: vec(0,0,0), size: vec(3,2.5,2), color: vec(0.6,0.6,0.7)});
+sphere({pos: vec(-0.6,0.3,0.9), radius: 0.3, color: color.yellow});
+sphere({pos: vec(0.6,0.3,0.9), radius: 0.3, color: color.yellow});
+box({pos: vec(0,-0.5,0.95), size: vec(1,0.2,0.1), color: color.red});
+cylinder({pos: vec(-0.7,1.25,0), axis: vec(0,1,0), radius: 0.08, color: vec(0.6,0.6,0.7)});
+cylinder({pos: vec(0.7,1.25,0), axis: vec(0,1,0), radius: 0.08, color: vec(0.6,0.6,0.7)});
+sphere({pos: vec(-0.7,2.25,0), radius: 0.15, color: color.red});
+sphere({pos: vec(0.7,2.25,0), radius: 0.15, color: color.red});`,
+    ct: ['분해', '추상화'],
+    hint: '머리, 눈, 입, 안테나를 각각 설명하세요. 좌우 대칭에 주목하세요',
+  },
+  {
+    id: 'battle-22',
+    level: 5,
+    emoji: '🧬',
+    title: '분자 모형',
+    description: null,
+    shapes: null,
+    code: `sphere({pos: vec(0,0,0), radius: 0.8, color: color.red});
+cylinder({pos: vec(0,0,0), axis: vec(2,1,0), radius: 0.1, color: vec(0.5,0.5,0.5)});
+sphere({pos: vec(2,1,0), radius: 0.5, color: color.blue});
+cylinder({pos: vec(0,0,0), axis: vec(-2,1,0), radius: 0.1, color: vec(0.5,0.5,0.5)});
+sphere({pos: vec(-2,1,0), radius: 0.5, color: color.blue});
+cylinder({pos: vec(0,0,0), axis: vec(0,-2,1.5), radius: 0.1, color: vec(0.5,0.5,0.5)});
+sphere({pos: vec(0,-2,1.5), radius: 0.5, color: color.green});`,
+    ct: ['분해', '추상화'],
+    hint: '중심, 결합봉, 끝 원자를 각각 설명하세요. 3차원 방향에 주목하세요',
+  },
+  {
+    id: 'battle-23',
+    level: 5,
+    emoji: '🎪',
+    title: '회전목마',
+    description: null,
+    shapes: null,
+    code: `cylinder({pos: vec(0,-2,0), axis: vec(0,4,0), radius: 0.3, color: color.yellow});
+cone({pos: vec(0,2,0), axis: vec(0,2,0), radius: 3, color: color.red});
+for (var i = 0; i < 8; i++) {
+    var a = i * Math.PI * 2 / 8;
+    sphere({pos: vec(Math.cos(a)*2.2, 0, Math.sin(a)*2.2), radius: 0.35, color: color.blue});
+}`,
+    ct: ['분해', '패턴인식'],
+    hint: '중심 기둥, 지붕, 좌석을 각각 설명하세요. 좌석의 배치 패턴에 주목하세요',
   },
 ]

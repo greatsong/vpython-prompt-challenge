@@ -8,6 +8,9 @@
     "dev:client": "vite",
     "dev:server": "node server.js",
     "build": "vite build",
+    "test:evaluation": "node tests/eval-regression.mjs",
+    "test:evaluation:internal": "node tests/eval-internal.mjs",
+    "test:e2e": "node tests/e2e-simulation.mjs",
     "start": "node server.js"
   },
   "dependencies": {

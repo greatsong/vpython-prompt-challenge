@@ -3,38 +3,75 @@
  * 브라우저에서 Express API를 통해 호출
  */
 
+import { getTeacherToken } from './teacherAuth.js'
+import { getTeamToken } from './teamAuth.js'
+
 const BASE = '/api'
 
-function getHeaders() {
-  const key = localStorage.getItem('vpython_api_key')
+/**
+ * 서버 에러 응답을 사람이 읽을 수 있는 메시지로 변환.
+ * 서버는 { error: "..." } 형태의 JSON을 주므로 error 필드만 뽑아낸다.
+ * (예전에는 응답 본문 원문을 그대로 던져 학생 화면에 날 JSON이 노출됐다)
+ */
+async function toReadableError(res) {
+  let text = ''
+  try { text = await res.text() } catch { /* 본문 읽기 실패는 무시 */ }
+
+  let message = ''
+  try {
+    const data = JSON.parse(text)
+    if (data && typeof data.error === 'string') message = data.error
+    else if (data && typeof data.message === 'string') message = data.message
+  } catch { /* JSON이 아니면 아래 기본 메시지 사용 */ }
+
+  if (!message) {
+    if (res.status === 401) message = '인증이 만료되었습니다. 입장 화면에서 다시 들어와주세요.'
+    else if (res.status === 429) message = '요청이 너무 많습니다. 잠시 후 다시 시도해주세요.'
+    else if (res.status >= 500) message = '서버가 잠시 불안정합니다. 잠시 후 다시 시도해주세요.'
+    else message = `요청에 실패했습니다 (오류 코드 ${res.status})`
+  }
+
+  const err = new Error(message)
+  err.status = res.status
+  return err
+}
+
+function getHeaders(teamId) {
   const headers = { 'Content-Type': 'application/json' }
-  if (key) headers['X-API-Key'] = key
+  const teamToken = getTeamToken(teamId)
+  if (teamId) {
+    if (teamToken) headers['x-team-token'] = teamToken
+    return headers
+  }
+
+  const teacherToken = getTeacherToken()
+  if (teacherToken) headers['x-teacher-token'] = teacherToken
   return headers
 }
 
 /**
  * 프롬프트로 VPython 코드 생성 (Haiku)
  */
-export async function generateCode(prompt) {
+export async function generateCode(prompt, teamId = null) {
   const res = await fetch(`${BASE}/generate`, {
     method: 'POST',
-    headers: getHeaders(),
-    body: JSON.stringify({ prompt }),
+    headers: getHeaders(teamId),
+    body: JSON.stringify({ prompt, teamId }),
   })
-  if (!res.ok) throw new Error(await res.text())
+  if (!res.ok) throw await toReadableError(res)
   return res.json()  // { code }
 }
 
 /**
  * 프롬프트 품질 평가 (Sonnet)
  */
-export async function evaluatePrompt({ prompt, generatedCode, targetCode, sessionNumber }) {
+export async function evaluatePrompt({ prompt, generatedCode, targetCode, challengeId, sessionNumber, teamId }) {
   const res = await fetch(`${BASE}/evaluate`, {
     method: 'POST',
-    headers: getHeaders(),
-    body: JSON.stringify({ prompt, generatedCode, targetCode, sessionNumber }),
+    headers: getHeaders(teamId),
+    body: JSON.stringify({ prompt, generatedCode, targetCode, challengeId, sessionNumber, teamId }),
   })
-  if (!res.ok) throw new Error(await res.text())
+  if (!res.ok) throw await toReadableError(res)
   return res.json()  // { score, ct_scores, feedback, strengths, improvements }
 }
 
@@ -47,7 +84,7 @@ export async function analyzeProblem({ code, title, difficulty }) {
     headers: getHeaders(),
     body: JSON.stringify({ code, title, difficulty }),
   })
-  if (!res.ok) throw new Error(await res.text())
+  if (!res.ok) throw await toReadableError(res)
   return res.json()
 }
 
@@ -60,7 +97,7 @@ export async function evaluateProblemQuality({ problemCode, solverPrompt, solver
     headers: getHeaders(),
     body: JSON.stringify({ problemCode, solverPrompt, solverScore }),
   })
-  if (!res.ok) throw new Error(await res.text())
+  if (!res.ok) throw await toReadableError(res)
   return res.json()
 }
 
@@ -70,9 +107,9 @@ export async function evaluateProblemQuality({ problemCode, solverPrompt, solver
 export async function saveAttempt(data) {
   const res = await fetch(`${BASE}/attempts`, {
     method: 'POST',
-    headers: getHeaders(),
+    headers: getHeaders(data.teamId),
     body: JSON.stringify(data),
   })
-  if (!res.ok) throw new Error(await res.text())
+  if (!res.ok) throw await toReadableError(res)
   return res.json()
 }

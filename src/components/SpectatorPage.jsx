@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useLocation } from 'react-router-dom'
 import { createSocket } from '../utils/socket.js'
 import VPythonRunner from './shared/VPythonRunner.jsx'
 import ChatPanel from './shared/ChatPanel.jsx'
 
 export default function SpectatorPage() {
   const { sessionId } = useParams()
+  const location = useLocation()
+  // JoinPage에서 넘겨준 관람 사유. 'capacity'면 정원 초과로 밀려난 것이므로 경고 배너를 띄운다.
+  const capacityReason = location.state?.reason === 'capacity' ? location.state : null
   const socketRef = useRef(null)
   const [teams, setTeams] = useState([])
   const [challenge, setChallenge] = useState(null)
@@ -13,7 +16,7 @@ export default function SpectatorPage() {
 
   const loadTeams = async () => {
     try {
-      const res = await fetch(`/api/dashboard/${sessionId}`)
+      const res = await fetch(`/api/public/dashboard/${sessionId}`)
       if (res.ok) {
         const data = await res.json()
         setTeams(data.teams || [])
@@ -68,6 +71,24 @@ export default function SpectatorPage() {
           {teams.length}팀 참여 중
         </span>
       </header>
+
+      {/* 정원 초과 경고 배너 — 학생이 왜 관람 모드인지 계속 보이도록 상단에 고정 노출 */}
+      {capacityReason && (
+        <div style={{
+          background: 'rgba(249, 115, 22, 0.15)',
+          borderBottom: '2px solid #f97316',
+          padding: '14px 20px',
+        }}>
+          <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+            <div style={{ fontWeight: 800, fontSize: '0.9375rem', marginBottom: '4px' }}>
+              ⚠️ 정원 초과로 관람 모드입니다 — 선생님께 알려주세요
+            </div>
+            <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+              {capacityReason.message || '팀 정원이 모두 차서 팀을 새로 만들 수 없었습니다.'}
+            </div>
+          </div>
+        </div>
+      )}
 
       <div style={{ maxWidth: '800px', margin: '0 auto', padding: '24px 20px' }}>
         {/* 현재 챌린지 */}

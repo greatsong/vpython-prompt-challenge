@@ -3,19 +3,274 @@ import ClassSetup from './ClassSetup.jsx'
 import SessionController from './SessionController.jsx'
 import ClassDashboard from './ClassDashboard.jsx'
 import TeacherGuide from './TeacherGuide.jsx'
+import { setTeacherToken, getTeacherToken, clearTeacherToken, teacherFetch } from '../../utils/teacherAuth.js'
 
-export default function TeacherApp() {
-  const [sessionId, setSessionId] = useState(null)
-  const [tab, setTab] = useState('info')
+const AUTH_KEY = 'vpython_teacher_auth'
+// 진행 중인 수업 정보 — 새로고침·재접속 후에도 같은 세션으로 복귀하기 위해 localStorage에 보관
+const SESSION_KEY = 'vpython_teacher_session'
 
-  const joinUrl = `${window.location.origin}/join`
+function loadSavedSession() {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY)
+    if (!raw) return null
+    const saved = JSON.parse(raw)
+    return saved?.sessionId ? saved : null
+  } catch {
+    return null
+  }
+}
 
-  if (!sessionId) {
-    return <ClassSetup onSessionCreated={setSessionId} />
+function saveSession(sessionId, teacherCode) {
+  try {
+    localStorage.setItem(SESSION_KEY, JSON.stringify({ sessionId, teacherCode }))
+  } catch { /* ignore */ }
+}
+
+function clearSavedSession() {
+  try {
+    localStorage.removeItem(SESSION_KEY)
+  } catch { /* ignore */ }
+}
+
+function TeacherGate({ onAuth }) {
+  const [pin, setPin] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const handleSubmit = async () => {
+    if (!pin.trim()) return setError('인증 코드를 입력해주세요')
+    setLoading(true)
+    setError('')
+    try {
+      const res = await fetch('/api/auth/teacher', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin: pin.trim() }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        if (data.token) setTeacherToken(data.token)
+        sessionStorage.setItem(AUTH_KEY, Date.now().toString())
+        onAuth()
+      } else {
+        const data = await res.json()
+        setError(data.error || '인증 실패')
+      }
+    } catch {
+      setError('서버 연결 오류')
+    }
+    setLoading(false)
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', flexDirection: 'column' }}>
+    <div style={{
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: 'var(--bg)',
+      padding: '24px',
+    }}>
+      <div style={{
+        width: '100%',
+        maxWidth: '380px',
+        background: 'var(--surface)',
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--radius-lg)',
+        padding: '32px',
+        textAlign: 'center',
+      }}>
+        <div style={{ fontSize: '2.5rem', marginBottom: '12px' }}>🔐</div>
+        <h1 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '6px' }}>
+          교사 인증
+        </h1>
+        <p style={{ color: 'var(--text-muted)', fontSize: '0.8125rem', marginBottom: '24px' }}>
+          교사용 인증 코드를 입력해주세요
+        </p>
+
+        <input
+          type="password"
+          inputMode="numeric"
+          value={pin}
+          onChange={(e) => setPin(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
+          placeholder="인증 코드 6자리"
+          maxLength={10}
+          autoFocus
+          style={{
+            width: '100%',
+            padding: '14px 16px',
+            background: 'var(--bg)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius)',
+            color: 'var(--text)',
+            fontSize: '1.25rem',
+            textAlign: 'center',
+            letterSpacing: '0.3em',
+            fontWeight: 700,
+            outline: 'none',
+          }}
+        />
+
+        {error && (
+          <p style={{ color: 'var(--danger)', fontSize: '0.8125rem', marginTop: '10px' }}>
+            {error}
+          </p>
+        )}
+
+        <button
+          onClick={handleSubmit}
+          disabled={loading}
+          style={{
+            marginTop: '16px',
+            width: '100%',
+            padding: '12px',
+            background: loading ? 'var(--surface2)' : 'var(--accent)',
+            color: 'white',
+            border: 'none',
+            borderRadius: 'var(--radius)',
+            fontSize: '1rem',
+            fontWeight: 700,
+            cursor: loading ? 'not-allowed' : 'pointer',
+          }}
+        >
+          {loading ? '확인 중...' : '인증'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+export default function TeacherApp() {
+  // 'checking' | 'authed' | 'unauthed'
+  // sessionStorage 타임스탬프만으로는 서버 재시작·토큰 만료를 알 수 없으므로
+  // 마운트 시 /api/auth/verify로 실제 토큰 유효성을 확인한다.
+  const [authState, setAuthState] = useState('checking')
+  const [sessionId, setSessionId] = useState(null)
+  const [restoringSession, setRestoringSession] = useState(true)
+  const [sessionFinished, setSessionFinished] = useState(false)
+  const [tab, setTab] = useState('info')
+
+  const handleAuthExpired = () => {
+    clearTeacherToken()
+    sessionStorage.removeItem(AUTH_KEY)
+    setAuthState('unauthed')
+  }
+
+  // 1) 토큰 실검증
+  useEffect(() => {
+    let cancelled = false
+    const verify = async () => {
+      if (!getTeacherToken()) {
+        clearTeacherToken()
+        sessionStorage.removeItem(AUTH_KEY)
+        if (!cancelled) setAuthState('unauthed')
+        return
+      }
+      try {
+        const res = await teacherFetch('/api/auth/verify')
+        if (cancelled) return
+        if (res.ok) {
+          setAuthState('authed')
+        } else {
+          clearTeacherToken()
+          sessionStorage.removeItem(AUTH_KEY)
+          setAuthState('unauthed')
+        }
+      } catch {
+        if (!cancelled) {
+          clearTeacherToken()
+          sessionStorage.removeItem(AUTH_KEY)
+          setAuthState('unauthed')
+        }
+      }
+    }
+    verify()
+    return () => { cancelled = true }
+  }, [])
+
+  // 2) 인증 후 저장된 수업 복귀
+  useEffect(() => {
+    if (authState !== 'authed') {
+      if (authState === 'unauthed') setRestoringSession(false)
+      return
+    }
+    let cancelled = false
+    const restore = async () => {
+      const saved = loadSavedSession()
+      if (!saved) {
+        if (!cancelled) setRestoringSession(false)
+        return
+      }
+      try {
+        const res = await fetch(`/api/session/${saved.sessionId}`)
+        if (cancelled) return
+        if (res.ok) {
+          const session = await res.json()
+          if (session.status !== 'ended') {
+            setSessionId(saved.sessionId)
+            setRestoringSession(false)
+            return
+          }
+        }
+      } catch { /* 네트워크 오류 시에도 설정 화면으로 */ }
+      if (cancelled) return
+      clearSavedSession()
+      setRestoringSession(false)
+    }
+    restore()
+    return () => { cancelled = true }
+  }, [authState])
+
+  const joinUrl = `${window.location.origin}/join`
+
+  const handleSessionCreated = ({ sessionId: id, teacherCode }) => {
+    if (!id) return
+    saveSession(id, teacherCode)
+    setSessionId(id)
+    setTab('info')
+  }
+
+  // 전체 수업 종료 — 저장된 수업 정보를 즉시 지운다.
+  // 대시보드는 최종 순위 표시·CSV 자동 다운로드를 끝내야 하므로 화면은 유지하고,
+  // 상단의 '새 수업 준비' 버튼으로 설정 화면에 복귀한다.
+  const handleFinalEnd = () => {
+    clearSavedSession()
+    setSessionFinished(true)
+  }
+
+  const handleNewClass = () => {
+    clearSavedSession()
+    setSessionFinished(false)
+    setSessionId(null)
+    setTab('info')
+  }
+
+  if (authState === 'checking' || (authState === 'authed' && restoringSession)) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'var(--bg)',
+        color: 'var(--text-muted)',
+      }}>
+        확인 중...
+      </div>
+    )
+  }
+
+  if (authState !== 'authed') {
+    return <TeacherGate onAuth={() => { setRestoringSession(true); setAuthState('authed') }} />
+  }
+
+  if (!sessionId) {
+    return <ClassSetup onSessionCreated={handleSessionCreated} onAuthExpired={handleAuthExpired} />
+  }
+
+  return (
+    <div style={{ height: '100vh', background: 'var(--bg)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       {/* 상단 바 */}
       <header style={{
         background: 'var(--surface)',
@@ -53,6 +308,23 @@ export default function TeacherApp() {
         </div>
 
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          {sessionFinished && (
+            <button
+              onClick={handleNewClass}
+              style={{
+                padding: '6px 14px',
+                borderRadius: 'var(--radius)',
+                border: 'none',
+                background: 'linear-gradient(135deg, #f59e0b, #ef4444)',
+                color: 'white',
+                fontWeight: 700,
+                fontSize: '0.8125rem',
+                cursor: 'pointer',
+              }}
+            >
+              🆕 새 수업 준비
+            </button>
+          )}
           <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>학생 접속:</span>
           <code
             onClick={() => navigator.clipboard?.writeText(joinUrl)}
@@ -74,7 +346,7 @@ export default function TeacherApp() {
 
       {/* 접속 안내 탭 */}
       {tab === 'info' && (
-        <div style={{ padding: '32px', maxWidth: '720px', margin: '0 auto', width: '100%' }}>
+        <div style={{ padding: '32px', maxWidth: '720px', margin: '0 auto', width: '100%', overflowY: 'auto', flex: 1, minHeight: 0 }}>
           <h2 style={{ fontSize: '1.125rem', fontWeight: 700, marginBottom: '20px' }}>
             학생 접속 안내
           </h2>
@@ -149,14 +421,20 @@ export default function TeacherApp() {
           display: 'grid',
           gridTemplateColumns: '260px 1fr',
           flex: 1,
+          minHeight: 0,
           overflow: 'hidden',
         }}>
           <aside style={{
             background: 'var(--surface)',
             borderRight: '1px solid var(--border)',
             overflowY: 'auto',
+            minHeight: 0,
           }}>
-            <SessionController sessionId={sessionId} />
+            <SessionController
+              sessionId={sessionId}
+              onFinalEnd={handleFinalEnd}
+              onAuthExpired={handleAuthExpired}
+            />
           </aside>
           <main style={{ overflowY: 'auto', padding: '24px' }}>
             <ClassDashboard sessionId={sessionId} />
@@ -171,7 +449,7 @@ function TeamList({ sessionId }) {
   const [teams, setTeams] = useState([])
 
   useEffect(() => {
-    fetch(`/api/dashboard/${sessionId}`)
+    teacherFetch(`/api/dashboard/${sessionId}`)
       .then((r) => r.json())
       .then((d) => setTeams(d.teams || []))
       .catch(() => {})
