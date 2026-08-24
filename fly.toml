@@ -11,10 +11,23 @@ primary_region = 'nrt'
 [http_service]
   internal_port = 4009
   force_https = true
-  auto_stop_machines = 'stop'
+  # 상시 가동. 이전 설정(auto_stop='stop' + min=0)에서는 유휴 시 머신이 정지해,
+  # 수업 시작에 학생 전원이 동시에 몰리는 순간이 콜드 스타트와 겹쳤다.
+  # 항상 켜두는 대신 요금이 상시 과금으로 바뀐다 — 방학 등 장기 미사용 시엔
+  # auto_stop_machines = 'stop' / min_machines_running = 0 으로 되돌릴 것.
+  auto_stop_machines = 'off'
   auto_start_machines = true
-  min_machines_running = 0
+  min_machines_running = 1
   processes = ['app']
+
+  # 헬스체크가 없으면 재시작 직후 Node가 뜨기 전에 프록시가 요청을 넘겨
+  # 학생 화면이 몇 초간 502를 받는다. /api/health 는 DB 응답까지 확인한다.
+  [[http_service.checks]]
+    interval = '15s'
+    timeout = '3s'
+    grace_period = '10s'
+    method = 'GET'
+    path = '/api/health'
 
 [mounts]
   source = 'vpython_data'

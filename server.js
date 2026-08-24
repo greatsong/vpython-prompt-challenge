@@ -620,6 +620,21 @@ app.get('/api/privacy', (req, res) => {
   })
 })
 
+// ── 헬스체크 ────────────────────────────────────────────────────────────────
+// Fly.io 프록시가 이 엔드포인트로 준비 상태를 확인한다. 이게 없으면 재시작 직후
+// Node가 뜨기 전에 프록시가 요청을 넘겨 학생 화면이 몇 초간 502를 받는다.
+// 인증 없이 접근 가능하되 내부 상태는 노출하지 않는다.
+app.get('/api/health', (req, res) => {
+  try {
+    // DB가 실제로 응답하는지까지 확인해야 "포트만 열린" 상태를 통과시키지 않는다
+    db.prepare('SELECT 1').get()
+    res.json({ ok: true })
+  } catch (e) {
+    console.error('[Health] DB 응답 실패:', e.message)
+    res.status(503).json({ ok: false })
+  }
+})
+
 // ── 프로덕션: React 빌드 파일 서빙 ──────────────────────────────────────────
 const distDir = join(__dirname, 'dist')
 if (fs.existsSync(distDir)) {

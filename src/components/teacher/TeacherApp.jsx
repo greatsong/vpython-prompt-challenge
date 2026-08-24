@@ -90,12 +90,13 @@ function TeacherGate({ onAuth }) {
 
         <input
           type="password"
-          inputMode="numeric"
           value={pin}
           onChange={(e) => setPin(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
-          placeholder="인증 코드 6자리"
-          maxLength={10}
+          placeholder="인증 코드"
+          // 인증 코드는 영문·숫자를 섞어 쓸 수 있고 길이 제한도 서버가 정한다.
+          // 여기서 좁게 잘라내면 뒷글자가 조용히 사라져 인증이 실패한다.
+          maxLength={64}
           autoFocus
           style={{
             width: '100%',

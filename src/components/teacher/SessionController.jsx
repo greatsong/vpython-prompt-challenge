@@ -4,7 +4,7 @@ import { BATTLE_CHALLENGES } from '../../data/challenges-battle.js'
 import { createSocket, emitWithAck } from '../../utils/socket.js'
 
 export default function SessionController({ sessionId, onFinalEnd, onAuthExpired }) {
-  const { currentChallenge, setChallenge } = useSessionStore()
+  const { currentChallenge, setChallenge, submissionProgress } = useSessionStore()
   const [selectedId, setSelectedId] = useState(null)
   // 'idle' | 'running' | 'ended'
   const [status, setStatus] = useState('idle')
@@ -152,6 +152,32 @@ export default function SessionController({ sessionId, onFinalEnd, onAuthExpired
   }
 
   const selected = BATTLE_CHALLENGES.find(ch => ch.id === selectedId)
+
+  // 대시보드가 집계한 현재 챌린지 제출 현황. 챌린지 id가 일치할 때만 쓴다.
+  const progressMatches =
+    submissionProgress.challengeId && submissionProgress.challengeId === selectedId
+  const pendingTeams = progressMatches
+    ? Math.max(0, submissionProgress.total - submissionProgress.submitted)
+    : 0
+
+  // 아직 평가가 안 끝난 팀이 있으면 안내만 한다 (버튼은 막지 않는다 — 교사가 의도적으로 넘길 수 있어야 한다)
+  const pendingNotice = pendingTeams > 0 && (
+    <p style={{
+      padding: '8px 10px',
+      background: 'rgba(245,158,11,0.12)',
+      border: '1px solid var(--warning)',
+      borderRadius: 'var(--radius)',
+      color: 'var(--warning)',
+      fontSize: '0.6875rem',
+      fontWeight: 600,
+      lineHeight: 1.5,
+      textAlign: 'center',
+    }}>
+      ⚠️ {submissionProgress.submitted} / {submissionProgress.total}팀 제출 —
+      아직 {pendingTeams}팀이 평가 처리 중입니다.
+      지금 넘기면 이 팀들의 결과가 빠질 수 있어요.
+    </p>
+  )
 
   const formatTime = (secs) => {
     const m = Math.floor(secs / 60)
@@ -356,6 +382,8 @@ export default function SessionController({ sessionId, onFinalEnd, onAuthExpired
               </button>
             )}
 
+            {pendingNotice}
+
             <button
               onClick={endChallenge}
               style={{
@@ -390,6 +418,7 @@ export default function SessionController({ sessionId, onFinalEnd, onAuthExpired
             }}>
               {selected?.emoji} {selected?.title} — 마감됨
             </div>
+            {pendingNotice}
             <button
               onClick={nextChallenge}
               style={{

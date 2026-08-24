@@ -7,12 +7,16 @@ import { generateCode } from '../../utils/claude.js'
 import { teacherFetch } from '../../utils/teacherAuth.js'
 
 export default function ClassDashboard({ sessionId }) {
-  const { currentChallenge } = useSessionStore()
+  const { currentChallenge, setSubmissionProgress } = useSessionStore()
   const { teams, setTeams, updateTeamScore } = useTeamStore()
   const socketRef = useRef(null)
   const challengeIdRef = useRef(null)
   // 팀 정원 (서버의 MAX_TEAMS). 헤더에 "N / M팀" 형태로 함께 보여준다.
   const [maxTeams, setMaxTeams] = useState(null)
+  // 지금 화면에 올라와 있는 teams 데이터가 어느 챌린지 기준인지.
+  // 챌린지를 바꾼 직후에는 아직 이전 챌린지 응답이 남아 있을 수 있어,
+  // 이 값이 currentChallenge와 일치할 때만 진행 현황을 집계한다.
+  const [loadedChallengeId, setLoadedChallengeId] = useState(null)
   // 데모 모드
   const [showDemo, setShowDemo] = useState(false)
   const [demoPrompt, setDemoPrompt] = useState('')
@@ -41,7 +45,10 @@ export default function ClassDashboard({ sessionId }) {
       : `/api/dashboard/${sessionId}`
     const res = await teacherFetch(url)
     const data = await res.json()
+    // 응답이 오는 사이에 챌린지가 바뀌었으면 이전 라운드 데이터이므로 버린다
+    if (challengeIdRef.current !== cid) return
     setTeams(data.teams)
+    setLoadedChallengeId(cid)
     if (data.maxTeams) setMaxTeams(data.maxTeams)
   }
 
@@ -62,6 +69,8 @@ export default function ClassDashboard({ sessionId }) {
   // ref 업데이트 + loadTeams를 하나의 useEffect로 합쳐서 순서 보장
   useEffect(() => {
     challengeIdRef.current = currentChallenge?.id ?? null
+    // 새 챌린지로 넘어가면 진행 현황을 즉시 0으로 되돌린다 (이전 라운드 집계가 남지 않도록)
+    setLoadedChallengeId(null)
     loadTeams()
     // 새 챌린지 시작 시 순위표 닫기 + 비교 초기화
     setChallengeRankings(null)
@@ -118,6 +127,25 @@ export default function ClassDashboard({ sessionId }) {
       chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight
     }
   }, [chatMessages])
+
+  // ── 현재 챌린지 제출 진행 현황 집계 ─────────────────────────────────────
+  // 관람자는 teams 테이블에 들어가지 않으므로 teams.length가 곧 실제 참여 팀 수다.
+  // hasSubmitted는 서버가 challengeId로 필터링해 내려준 값이라 이전 챌린지 제출은 섞이지 않는다.
+  const activeTeamCount = teams.length
+  const submittedCount = teams.filter((t) => t.hasSubmitted).length
+  const pendingCount = Math.max(0, activeTeamCount - submittedCount)
+  // 지금 진행 중인 챌린지 기준의 데이터가 실제로 로드됐을 때만 집계를 신뢰한다
+  const progressReady = !!currentChallenge && loadedChallengeId === currentChallenge.id
+  const allSubmitted = progressReady && activeTeamCount > 0 && pendingCount === 0
+
+  // 형제 컴포넌트(SessionController)가 경고를 띄울 수 있도록 store에 공유
+  useEffect(() => {
+    setSubmissionProgress(
+      progressReady
+        ? { challengeId: currentChallenge.id, submitted: submittedCount, total: activeTeamCount }
+        : { challengeId: null, submitted: 0, total: 0 }
+    )
+  }, [progressReady, currentChallenge?.id, submittedCount, activeTeamCount])
 
   const handleReveal = () => {
     socketRef.current?.emit('challenge:reveal', {
@@ -457,6 +485,70 @@ export default function ClassDashboard({ sessionId }) {
           </button>
         </div>
       </div>
+
+      {/* 라운드 진행 현황 — 지금 챌린지에 몇 팀이 제출을 마쳤는지 한눈에 */}
+      {progressReady && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '20px',
+          flexWrap: 'wrap',
+          padding: '16px 20px',
+          marginBottom: '16px',
+          background: allSubmitted ? 'rgba(34,197,94,0.1)' : 'rgba(245,158,11,0.1)',
+          border: `2px solid ${allSubmitted ? 'var(--success)' : 'var(--warning)'}`,
+          borderRadius: 'var(--radius-lg)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+            <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+              제출
+            </span>
+            <span style={{
+              fontSize: '2rem',
+              fontWeight: 800,
+              lineHeight: 1,
+              fontVariantNumeric: 'tabular-nums',
+              color: allSubmitted ? 'var(--success)' : 'var(--warning)',
+            }}>
+              {submittedCount}
+            </span>
+            <span style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--text-muted)' }}>
+              / {activeTeamCount}팀
+            </span>
+          </div>
+
+          {/* 진행 막대 */}
+          <div style={{
+            flex: 1,
+            minWidth: '140px',
+            height: '10px',
+            background: 'var(--surface2)',
+            borderRadius: '999px',
+            overflow: 'hidden',
+          }}>
+            <div style={{
+              width: activeTeamCount > 0 ? `${(submittedCount / activeTeamCount) * 100}%` : '0%',
+              height: '100%',
+              background: allSubmitted ? 'var(--success)' : 'var(--warning)',
+              transition: 'width 0.3s ease-out',
+            }} />
+          </div>
+
+          <span style={{
+            fontSize: '0.875rem',
+            fontWeight: 700,
+            color: allSubmitted ? 'var(--success)' : 'var(--warning)',
+          }}>
+            {activeTeamCount === 0
+              ? '아직 참여한 팀이 없습니다'
+              : allSubmitted
+                ? '✓ 전원 제출 완료 — 결과 공개해도 됩니다'
+                : submittedCount === 0
+                  ? `⏳ 아직 제출한 팀이 없습니다 — ${pendingCount}팀 대기`
+                  : `⏳ 평가 처리 중… ${pendingCount}팀 대기`}
+          </span>
+        </div>
+      )}
 
       {/* 학생 등록 알림 */}
       {recentStudent && (
