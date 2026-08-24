@@ -751,8 +751,8 @@ export default function BattleMode({ team, socket, rankings, challengeEnded, rem
             </span>
           </div>
 
-          {/* 안내 문구 */}
-          <p style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginBottom: '10px', fontStyle: 'italic' }}>
+          {/* 안내 문구 — 0.6875rem(11px)은 학생 휴대폰에서 읽기 어려워 0.8125rem(13px)으로 키웠다 */}
+          <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '10px', fontStyle: 'italic', lineHeight: 1.5 }}>
             점수는 여러분의 설명 품질을 평가합니다. AI가 만든 3D 결과와는 다를 수 있어요.
           </p>
 

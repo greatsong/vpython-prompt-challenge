@@ -418,7 +418,15 @@ export default function JoinPage() {
         padding: '32px',
         animation: 'fadeIn 0.4s ease-out',
       }}>
-        <h1 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '6px', textAlign: 'center' }}>
+        {/* keep-all: 한글이 어절 중간에서 잘려 "챌린 / 지"가 되던 것을 막는다.
+            clamp: 좁은 화면(320px)에서는 글자를 줄여 두 줄로 흘러넘치지 않게 한다. */}
+        <h1 style={{
+          fontSize: 'clamp(1.15rem, 5.5vw, 1.5rem)',
+          fontWeight: 700,
+          marginBottom: '6px',
+          textAlign: 'center',
+          wordBreak: 'keep-all',
+        }}>
           🧠 VPython 프롬프트 챌린지
         </h1>
         <p style={{ color: 'var(--text-muted)', textAlign: 'center', marginBottom: '24px', fontSize: '0.875rem' }}>
