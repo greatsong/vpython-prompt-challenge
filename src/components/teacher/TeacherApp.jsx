@@ -225,6 +225,18 @@ export default function TeacherApp() {
 
   const joinUrl = `${window.location.origin}/join`
 
+  // 학생이 휴대폰으로 스캔할 QR — 수업 코드가 담겨 있어 코드 입력 단계가 사라진다
+  const [joinQr, setJoinQr] = useState(null)
+  useEffect(() => {
+    if (!sessionId) { setJoinQr(null); return }
+    let cancelled = false
+    teacherFetch(`/api/session/${sessionId}/join-qr`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (!cancelled && d?.qr) setJoinQr(d) })
+      .catch(() => { /* QR을 못 만들어도 주소 안내는 그대로 쓸 수 있다 */ })
+    return () => { cancelled = true }
+  }, [sessionId])
+
   const handleSessionCreated = ({ sessionId: id, teacherCode }) => {
     if (!id) return
     saveSession(id, teacherCode)
@@ -360,8 +372,41 @@ export default function TeacherApp() {
             marginBottom: '24px',
             textAlign: 'center',
           }}>
-            <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '10px' }}>
-              아래 주소를 칠판에 적거나 공유하세요
+            <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '14px' }}>
+              휴대폰 카메라로 QR을 비추면 수업 코드까지 자동으로 입력됩니다
+            </p>
+
+            {/* QR — 교실 뒤에서도 읽히도록 크게. 어두운 테마에서도 스캔되게 흰 바탕을 깐다 */}
+            {joinQr ? (
+              <img
+                src={joinQr.qr}
+                alt="학생 참여 QR코드"
+                style={{
+                  width: 'min(260px, 60vw)',
+                  aspectRatio: '1 / 1',
+                  display: 'block',
+                  margin: '0 auto 14px',
+                  background: '#fff',
+                  padding: '10px',
+                  borderRadius: 'var(--radius)',
+                }}
+              />
+            ) : (
+              <div style={{
+                width: 'min(260px, 60vw)',
+                aspectRatio: '1 / 1',
+                margin: '0 auto 14px',
+                background: 'var(--surface2)',
+                borderRadius: 'var(--radius)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '0.8125rem', color: 'var(--text-muted)',
+              }}>
+                QR 생성 중…
+              </div>
+            )}
+
+            <p style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', marginBottom: '6px' }}>
+              카메라가 안 되면 아래 주소로 직접 접속하세요
             </p>
             <div style={{
               fontSize: '1.375rem',

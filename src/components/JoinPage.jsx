@@ -40,9 +40,20 @@ function Confetti() {
   )
 }
 
+// QR로 들어온 경우 주소에 담긴 수업 코드(?code=)를 그대로 채운다.
+// localStorage 프리필과 달리 이 값은 선생님이 방금 띄운 QR에서 온 것이라
+// 지난 수업 코드가 남아 학생을 엉뚱한 수업으로 보낼 위험이 없다.
+function codeFromUrl() {
+  try {
+    return new URLSearchParams(window.location.search).get('code')?.trim() || ''
+  } catch {
+    return ''
+  }
+}
+
 export default function JoinPage() {
   const navigate = useNavigate()
-  const [teacherCode, setTeacherCode] = useState('')
+  const [teacherCode, setTeacherCode] = useState(codeFromUrl)
   const [lastTeacherCode] = useState(() => localStorage.getItem(LS_TEACHER_CODE) || '')
   const [s1Number, setS1Number] = useState('')
   const [s1Name, setS1Name] = useState('')
@@ -443,7 +454,9 @@ export default function JoinPage() {
           style={inputStyle}
           autoFocus
         />
-        {lastTeacherCode && lastTeacherCode !== teacherCode && (
+        {/* QR로 들어와 코드가 이미 채워졌으면 지난 코드 힌트는 숨긴다.
+            선생님이 방금 띄운 코드가 옳은데 옛 코드를 권하면 오히려 헷갈린다. */}
+        {!codeFromUrl() && lastTeacherCode && lastTeacherCode !== teacherCode && (
           <button
             type="button"
             onClick={handleUseLastCode}

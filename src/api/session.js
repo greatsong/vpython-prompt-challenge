@@ -276,6 +276,28 @@ router.get('/:id/qr', requireTeacher, async (req, res) => {
   res.json({ url, qr })
 })
 
+// GET /api/session/:id/join-qr — 참여 화면 QR코드
+// 학생이 휴대폰으로 스캔해 바로 들어오는 용도. 수업 코드를 쿼리에 담아
+// 칠판에 적은 코드를 옮겨 적다 틀리는 일을 없앤다.
+router.get('/:id/join-qr', requireTeacher, async (req, res) => {
+  const session = req.db
+    .prepare('SELECT teacher_code FROM sessions WHERE id = ?')
+    .get(req.params.id)
+  if (!session) return res.status(404).json({ error: '수업 없음' })
+
+  const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http'
+  const host = req.headers.host || 'localhost:4009'
+  const url = `${protocol}://${host}/join?code=${encodeURIComponent(session.teacher_code)}`
+  // 교실 뒤에서도 스캔되도록 넉넉한 크기와 높은 오류 정정 수준으로 만든다
+  const qr = await QRCode.toDataURL(url, {
+    width: 512,
+    margin: 1,
+    errorCorrectionLevel: 'M',
+    color: { dark: '#000000', light: '#ffffff' },
+  })
+  res.json({ url, qr })
+})
+
 // GET /api/session/:id — 수업 정보
 router.get('/:id', (req, res) => {
   const session = req.db
