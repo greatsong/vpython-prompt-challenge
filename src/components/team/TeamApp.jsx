@@ -196,7 +196,7 @@ export default function TeamApp() {
       goRejoin(reason === 'session_unavailable' ? SESSION_ENDED_NOTICE : REJOIN_NOTICE)
     })
 
-    socket.on('challenge:started', ({ challengeId, timeLimit, startedAt }) => {
+    socket.on('challenge:started', ({ challengeId, timeLimit, startedAt, challenge }) => {
       latestChallengeIdRef.current = challengeId
       // 진행 중인 챌린지가 있으면(재접속 복원 포함) 앞서 공개된 결과는 더 이상 현재 화면이 아니다
       clearRevealed(myTeam.session_id)
@@ -205,6 +205,12 @@ export default function TeamApp() {
       setFinalResults(null)
       setRoundStartedAt(startedAt ?? null)
       startCountdown(timeLimit)
+      // 서버가 시작 이벤트에 챌린지 정보(목표 코드 포함)를 실어 보내면 상세 조회 없이 바로 장면을 만든다
+      if (challenge && challenge.id === challengeId && typeof challenge.code === 'string' && challenge.code) {
+        setChallenge(challenge)
+        return
+      }
+      // 예전 서버처럼 코드가 없으면 상세 API로 받아 온다
       fetch(`/api/challenges/${challengeId}`)
         .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`챌린지 조회 실패 (${r.status})`))))
         .then((data) => {

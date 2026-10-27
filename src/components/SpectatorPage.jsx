@@ -106,11 +106,16 @@ export default function SpectatorPage() {
         .catch(console.error)
     }
 
-    socket.on('challenge:started', ({ challengeId }) => {
+    socket.on('challenge:started', ({ challengeId, challenge } = {}) => {
       latestChallengeIdRef.current = challengeId
       clearRevealed(sessionId)
       setChallengeEnded(false)
       setRankings(null)
+      // 시작 이벤트에 챌린지 정보(목표 코드 포함)가 있으면 상세 조회 없이 바로 반영한다
+      if (challenge && challenge.id === challengeId && typeof challenge.code === 'string' && challenge.code) {
+        setChallenge(challenge)
+        return
+      }
       loadChallenge(challengeId)
     })
 
@@ -246,7 +251,7 @@ export default function SpectatorPage() {
             <h2 style={{ fontSize: '1.125rem', fontWeight: 800, marginBottom: '12px' }}>
               {challenge.emoji} {challenge.title}
             </h2>
-            <VPythonRunner code={challenge.code} height="250px" label="목표 장면" />
+            <VPythonRunner code={challenge.code} height="250px" label="목표 장면" loadingText={`${challenge.title} 문제를 출제 중입니다.`} />
           </div>
         )}
 

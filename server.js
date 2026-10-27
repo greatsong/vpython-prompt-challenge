@@ -11,7 +11,7 @@ import fs from 'fs'
 import routesSession from './src/api/session.js'
 import routesChallenges from './src/api/challenges.js'
 import routesAI from './src/api/ai.js'
-import routesDashboard, { queryRankings } from './src/api/dashboard.js'
+import routesDashboard, { queryRankings, computeFinalResults } from './src/api/dashboard.js'
 import { setApiKey, getApiKey, hasApiKey } from './src/api/apiKeyStore.js'
 import QRCode from 'qrcode'
 import {
@@ -498,6 +498,14 @@ function parseMembersSafe(json) {
   }
 }
 
+// challenge:started에 실을 챌린지 정보 — GET /api/challenges/:id 응답과 같은 객체(제목·레벨·설명·목표 코드)다.
+// 팀·관람 화면이 이 값을 바로 써서 상세 조회 왕복(약 0.2초)을 건너뛰고 목표 장면을 곧바로 만든다.
+// 노출 범위는 그대로다. 상세 API가 이미 무인증으로 같은 코드를 주고, 방송은 그 수업 방에만 간다.
+// 프리셋에 없는 id(예전 DB 기록 등)면 null을 보내고, 클라이언트는 예전처럼 상세 API를 부른다.
+function challengeForBroadcast(challengeId) {
+  return getChallenge(challengeId) || null
+}
+
 io.on('connection', (socket) => {
   console.log(`[Socket] 접속: ${socket.id}`)
 
@@ -536,6 +544,7 @@ io.on('connection', (socket) => {
       timeLimit: remaining,
       startedAt: ac.startedAt,
       resumed: true,
+      challenge: challengeForBroadcast(ac.challengeId),
     })
     return true
   }
@@ -765,7 +774,12 @@ io.on('connection', (socket) => {
     const startedAt = Date.now()
     // 캐시 + DB에 기록 — 서버가 재시작돼도 이 레코드로 복구된다
     persistActiveChallenge(sessionId, { challengeId, timeLimit: limit, startedAt })
-    io.to(`session:${sessionId}`).emit('challenge:started', { challengeId, timeLimit: limit, startedAt })
+    io.to(`session:${sessionId}`).emit('challenge:started', {
+      challengeId,
+      timeLimit: limit,
+      startedAt,
+      challenge: challengeForBroadcast(challengeId),
+    })
     reply?.({ ok: true, startedAt })
 
     // 타이머 설정 시 자동 종료
@@ -808,65 +822,18 @@ io.on('connection', (socket) => {
       // 진행 중인 챌린지/타이머 정리 + 마감 기록
       endActiveChallenge(sessionId)
 
-      // 종합 결과 계산
-      const teams = db.prepare('SELECT * FROM teams WHERE session_id = ?').all(sessionId)
-      const challenges = db.prepare(`
-        SELECT DISTINCT a.challenge_id
-        FROM attempts a JOIN teams t ON t.id = a.team_id
-        WHERE t.session_id = ?
-      `).all(sessionId)
-
-      console.log(`[Session] 결과 계산: ${teams.length}팀, ${challenges.length}챌린지`)
-
-      const results = teams.map(team => {
-        let totalScore = 0
-        const challengeResults = []
-
-        for (const { challenge_id } of challenges) {
-          const best = db.prepare(`
-            SELECT prompt, score, evaluation, generated_code
-            FROM attempts
-            WHERE team_id = ? AND challenge_id = ?
-            ORDER BY score DESC LIMIT 1
-          `).get(team.id, challenge_id)
-
-          if (best) {
-            totalScore += best.score
-            let evalData = {}
-            try { evalData = JSON.parse(best.evaluation || '{}') } catch {}
-            challengeResults.push({
-              challengeId: challenge_id,
-              score: best.score,
-              prompt: best.prompt,
-              feedback: evalData.feedback || '',
-              strengths: evalData.strengths || [],
-            })
-          } else {
-            challengeResults.push({
-              challengeId: challenge_id,
-              score: 0,
-              prompt: '',
-              feedback: '',
-              strengths: [],
-            })
-          }
-        }
-
-        return {
-          teamId: team.id,
-          teamName: team.name,
-          teamColor: team.color,
-          members: parseMembersSafe(team.members),
-          totalScore,
-          challengeResults,
-        }
-      })
-
-      results.sort((a, b) => b.totalScore - a.totalScore)
+      // 종합 결과 계산 — 최종 CSV와 같은 집계(dashboard.js computeFinalResults)
+      // 시도가 하나도 없는 팀은 submitted:false·rank:null로 맨 뒤에 온다.
+      const { results: finalRows, challengeIds } = computeFinalResults(db, sessionId)
+      console.log(`[Session] 결과 계산: ${finalRows.length}팀, ${challengeIds.length}챌린지`)
+      const results = finalRows.map(({ membersJson, ...row }) => ({
+        ...row,
+        members: parseMembersSafe(membersJson),
+      }))
 
       io.to(`session:${sessionId}`).emit('session:final-ended', {
         rankings: results,
-        challengeCount: challenges.length,
+        challengeCount: challengeIds.length,
       })
 
       // DB 세션 상태를 ended로 업데이트 (같은 수업코드 재사용 시 새 세션 분리)
@@ -876,7 +843,7 @@ io.on('connection', (socket) => {
       io.to(`session:${sessionId}`).emit('challenge:ended', {})
       io.to(`session:${sessionId}`).emit('session:ended', {})
 
-      console.log(`[Session] 최종 종료 완료: session=${sessionId}, ${teams.length}팀, ${challenges.length}챌린지`)
+      console.log(`[Session] 최종 종료 완료: session=${sessionId}, ${results.length}팀, ${challengeIds.length}챌린지`)
       reply?.({ ok: true })
     } catch (err) {
       console.error(`[Session] 최종 종료 에러: session=${sessionId}`, err)
@@ -1032,11 +999,25 @@ app.use('/api', (req, res) => {
 
 // ── 프로덕션: React 빌드 파일 서빙 ──────────────────────────────────────────
 const distDir = join(__dirname, 'dist')
+// 캐시 정책
+//  - /lib/glowscript/*: 3D 라이브러리(glow.3.2.min.js 4.4MB 등). 장면 iframe이 매번 6개를 재검증하느라
+//    캐시가 있어도 왕복 6번(각 70~120ms)이 들었다. 1년 immutable로 두고, 파일이 바뀌면
+//    src/utils/glowscript.js가 붙이는 ?v=<내용 해시>(vite.config.js)가 바뀌어 새로 받는다.
+//  - /assets/*: Vite가 파일 이름에 해시를 붙이므로 같은 장기 캐시를 준다.
+//  - index.html: 새 배포의 해시 파일 이름을 바로 가리키도록 no-cache(매번 재검증)로 둔다.
+const LONG_CACHE = 'public, max-age=31536000, immutable'
 if (fs.existsSync(distDir)) {
-  app.use(express.static(distDir))
+  app.use('/lib/glowscript', express.static(join(distDir, 'lib', 'glowscript'), { maxAge: '1y', immutable: true }))
+  app.use(express.static(distDir, {
+    setHeaders(res, filePath) {
+      const rel = filePath.slice(distDir.length).replace(/\\/g, '/')
+      if (rel.startsWith('/assets/')) res.setHeader('Cache-Control', LONG_CACHE)
+      else if (rel === '/index.html') res.setHeader('Cache-Control', 'no-cache')
+    },
+  }))
   // SPA 라우팅 — /api 제외한 모든 경로를 index.html로
   app.get(/^(?!\/api).*/, (req, res) => {
-    res.sendFile(join(distDir, 'index.html'))
+    res.sendFile(join(distDir, 'index.html'), { headers: { 'Cache-Control': 'no-cache' } })
   })
   console.log('📦 프로덕션 모드: dist/ 서빙 중')
 }

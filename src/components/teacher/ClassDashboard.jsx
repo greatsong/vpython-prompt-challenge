@@ -6,6 +6,7 @@ import VPythonRunner from '../shared/VPythonRunner.jsx'
 import { generateCode } from '../../utils/claude.js'
 import { teacherFetch, clearTeacherToken, getTeacherToken } from '../../utils/teacherAuth.js'
 import { BATTLE_CHALLENGES } from '../../data/challenges-battle.js'
+import { orderFinalRankings } from '../../utils/finalRanking.js'
 
 // 챌린지 id → 제목 (최종 결과에 id 대신 제목을 보여 준다)
 const CHALLENGE_TITLES = Object.fromEntries(BATTLE_CHALLENGES.map((c) => [c.id, `${c.emoji || ''} ${c.title}`.trim()]))
@@ -353,6 +354,9 @@ export default function ClassDashboard({ sessionId, onAuthExpired }) {
   // ── 최종 결과 화면 ──────────────────────────────────────────────────────
   if (finalResults) {
     const { rankings, challengeCount } = finalResults
+    // 미제출 팀(시도 0건)은 순위 번호·메달 없이 맨 뒤에 "미제출"로 둔다
+    const ordered = orderFinalRankings(rankings)
+    const MEDAL_BORDERS = ['var(--gold)', '#B9BFC8', '#D9A27A']
     return (
       <div>
         <div style={{
@@ -385,7 +389,7 @@ export default function ClassDashboard({ sessionId, onAuthExpired }) {
             종합 순위
           </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {rankings.map((r, i) => (
+            {ordered.map(({ r, rank, unsubmitted }, i) => (
               <div
                 key={r.teamId}
                 style={{
@@ -393,20 +397,26 @@ export default function ClassDashboard({ sessionId, onAuthExpired }) {
                   alignItems: 'center',
                   gap: '16px',
                   padding: '12px 16px',
-                  background: i === 0
+                  background: rank === 1
                     ? 'var(--card)'
-                    : i === 1
+                    : rank === 2
                       ? '#F5F6F8'
-                      : i === 2
+                      : rank === 3
                         ? '#FBF0E6'
                         : i % 2 === 0 ? 'var(--card2)' : 'var(--surface)',
-                  border: `1px solid ${i < 3 ? ['var(--gold)', '#B9BFC8', '#D9A27A'][i] : 'var(--border)'}`,
+                  border: `1px solid ${rank >= 1 && rank <= 3 ? MEDAL_BORDERS[rank - 1] : 'var(--border)'}`,
                   borderRadius: 'var(--radius)',
                 }}
               >
-                <span style={{ fontSize: '1.25rem', width: '36px', textAlign: 'center' }}>
-                  {['🥇', '🥈', '🥉'][i] || `${i + 1}`}
-                </span>
+                {unsubmitted ? (
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, width: '36px', textAlign: 'center', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                    미제출
+                  </span>
+                ) : (
+                  <span style={{ fontSize: '1.25rem', width: '36px', textAlign: 'center' }}>
+                    {['🥇', '🥈', '🥉'][rank - 1] || `${rank}`}
+                  </span>
+                )}
                 <div style={{
                   width: '14px', height: '14px', borderRadius: '50%',
                   background: r.teamColor, flexShrink: 0,
@@ -417,12 +427,14 @@ export default function ClassDashboard({ sessionId, onAuthExpired }) {
                     {(r.members || []).join(', ')}
                   </span>
                 </div>
-                <span style={{
-                  fontSize: '1.5rem', fontWeight: 800,
-                  color: 'var(--accent-text)',
-                }}>
-                  {r.totalScore}점
-                </span>
+                {!unsubmitted && (
+                  <span style={{
+                    fontSize: '1.5rem', fontWeight: 800,
+                    color: 'var(--accent-text)',
+                  }}>
+                    {r.totalScore}점
+                  </span>
+                )}
               </div>
             ))}
           </div>
@@ -441,8 +453,8 @@ export default function ClassDashboard({ sessionId, onAuthExpired }) {
             팀별 프롬프트 & 피드백
           </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {rankings.map((r, i) => (
-              <details key={r.teamId} open={i < 3} style={{
+            {ordered.map(({ r, rank, unsubmitted }) => (
+              <details key={r.teamId} open={rank !== null && rank <= 3} style={{
                 background: 'var(--card2)',
                 borderRadius: 'var(--radius)',
                 border: `1px solid ${r.teamColor}33`,
@@ -457,15 +469,17 @@ export default function ClassDashboard({ sessionId, onAuthExpired }) {
                   fontWeight: 600,
                   fontSize: '0.875rem',
                 }}>
-                  <span>{['🥇', '🥈', '🥉'][i] || `${i + 1}위`}</span>
+                  <span>{unsubmitted ? '미제출' : (['🥇', '🥈', '🥉'][rank - 1] || `${rank}위`)}</span>
                   <div style={{
                     width: '10px', height: '10px', borderRadius: '50%',
                     background: r.teamColor,
                   }} />
                   <span>{r.teamName}</span>
-                  <span style={{ marginLeft: 'auto', fontWeight: 800, color: r.teamColor }}>
-                    {r.totalScore}점
-                  </span>
+                  {!unsubmitted && (
+                    <span style={{ marginLeft: 'auto', fontWeight: 800, color: r.teamColor }}>
+                      {r.totalScore}점
+                    </span>
+                  )}
                 </summary>
                 <div style={{ padding: '0 16px 16px' }}>
                   {r.challengeResults.map((cr) => (

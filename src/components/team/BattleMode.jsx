@@ -4,6 +4,7 @@ import useTeamStore from '../../store/teamStore.js'
 import VPythonRunner from '../shared/VPythonRunner.jsx'
 import { generateCode, evaluatePrompt, saveAttempt } from '../../utils/claude.js'
 import { BATTLE_CHALLENGES } from '../../data/challenges-battle.js'
+import { orderFinalRankings } from '../../utils/finalRanking.js'
 
 // sessionStorage 키
 const STORAGE_KEY = 'vpython_battle_state'
@@ -478,8 +479,10 @@ export default function BattleMode({ team, socket, rankings, challengeEnded, rem
   // ── 최종 결과 화면 ──────────────────────────────────────────────────────
   if (finalResults) {
     const { rankings: finalRankings, challengeCount } = finalResults
-    const myRank = finalRankings.findIndex(r => r.teamId === team.id)
-    const myResult = finalRankings[myRank]
+    // 미제출 팀(시도 0건)은 순위 번호·메달 없이 맨 뒤에 "미제출"로 둔다
+    const ordered = orderFinalRankings(finalRankings)
+    const myEntry = ordered.find(({ r }) => r.teamId === team.id)
+    const myResult = myEntry?.r
 
     return (
       <div style={{ padding: '24px' }}>
@@ -496,7 +499,7 @@ export default function BattleMode({ team, socket, rankings, challengeEnded, rem
             🏆 최종 결과
           </h2>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>
-            {finalRankings.length}팀 · {challengeCount}개 챌린지 종합
+            {(finalRankings || []).length}팀 · {challengeCount}개 챌린지 종합
           </p>
         </div>
 
@@ -511,18 +514,30 @@ export default function BattleMode({ team, socket, rankings, challengeEnded, rem
             marginBottom: '20px',
             textAlign: 'center',
           }}>
-            <div style={{ fontSize: '2rem', marginBottom: '8px' }}>
-              {['🥇', '🥈', '🥉'][myRank] || `${myRank + 1}위`}
-            </div>
+            {myEntry.unsubmitted ? (
+              <div style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-muted)', marginBottom: '8px' }}>
+                미제출
+              </div>
+            ) : (
+              <div style={{ fontSize: '2rem', marginBottom: '8px' }}>
+                {['🥇', '🥈', '🥉'][myEntry.rank - 1] || `${myEntry.rank}위`}
+              </div>
+            )}
             <div style={{ fontSize: '1.125rem', fontWeight: 700, marginBottom: '4px' }}>
               {team.name}
             </div>
-            <div style={{ fontSize: '2rem', fontWeight: 800, color: team.color }}>
-              {myResult.totalScore}점
-            </div>
+            {myEntry.unsubmitted ? (
+              <div style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
+                이번 수업에서 제출한 기록이 없습니다.
+              </div>
+            ) : (
+              <div style={{ fontSize: '2rem', fontWeight: 800, color: team.color }}>
+                {myResult.totalScore}점
+              </div>
+            )}
 
             {/* 내 팀 프롬프트별 피드백 */}
-            {myResult.challengeResults.map((cr) => cr.prompt && (
+            {(myResult.challengeResults || []).map((cr) => cr.prompt && (
               <div key={cr.challengeId} style={{
                 textAlign: 'left',
                 marginTop: '12px',
@@ -570,7 +585,7 @@ export default function BattleMode({ team, socket, rankings, challengeEnded, rem
 
         {/* 전체 순위 */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {finalRankings.map((r, i) => {
+          {ordered.map(({ r, rank, unsubmitted }) => {
             const isMe = r.teamId === team.id
             return (
               <div
@@ -582,25 +597,33 @@ export default function BattleMode({ team, socket, rankings, challengeEnded, rem
                   padding: '10px 14px',
                   background: isMe
                     ? `${team.color}15`
-                    : i === 0
+                    : rank === 1
                       ? 'var(--card)'
                       : 'var(--surface)',
-                  border: `1px solid ${isMe ? team.color : i === 0 ? 'var(--gold)' : 'var(--border)'}`,
+                  border: `1px solid ${isMe ? team.color : rank === 1 ? 'var(--gold)' : 'var(--border)'}`,
                   borderRadius: 'var(--radius)',
                 }}
               >
-                <span style={{ fontSize: '1.125rem', width: '28px', textAlign: 'center' }}>
-                  {['🥇', '🥈', '🥉'][i] || `${i + 1}`}
-                </span>
+                {unsubmitted ? (
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, minWidth: '28px', textAlign: 'center', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                    미제출
+                  </span>
+                ) : (
+                  <span style={{ fontSize: '1.125rem', width: '28px', textAlign: 'center' }}>
+                    {['🥇', '🥈', '🥉'][rank - 1] || `${rank}`}
+                  </span>
+                )}
                 <span style={{ flex: 1, fontWeight: isMe ? 800 : 600, fontSize: '0.875rem' }}>
                   {r.teamName} {isMe && '← 우리 팀'}
                 </span>
-                <span style={{
-                  fontSize: '1.125rem', fontWeight: 800,
-                  color: isMe ? team.color : 'var(--accent-text)',
-                }}>
-                  {r.totalScore}점
-                </span>
+                {!unsubmitted && (
+                  <span style={{
+                    fontSize: '1.125rem', fontWeight: 800,
+                    color: isMe ? team.color : 'var(--accent-text)',
+                  }}>
+                    {r.totalScore}점
+                  </span>
+                )}
               </div>
             )
           })}
@@ -766,12 +789,14 @@ export default function BattleMode({ team, socket, rankings, challengeEnded, rem
           code={currentChallenge.code}
           height="var(--scene-h, 200px)"
           label="👁 이 장면을 묘사하세요"
+          loadingText={`${currentChallenge.title} 문제를 출제 중입니다.`}
         />
         <VPythonRunner
           key={sceneRunNonce}
           code={generatedCode}
           height="var(--scene-h, 200px)"
           label="🤖 AI가 만든 장면"
+          loadingText="AI가 만든 장면을 그리는 중입니다."
           autoRun={!!generatedCode && !restoredCode}
           onError={handleRenderError}
           onReady={handleRenderReady}

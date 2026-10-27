@@ -19,6 +19,17 @@ const loadSavedSession = () => loadTeacherSession(getTeacherScope())
 const saveSession = (sessionId, teacherCode) => saveTeacherSession(sessionId, teacherCode, getTeacherScope())
 const clearSavedSession = () => clearTeacherSession(getTeacherScope())
 
+// 접속 안내 카드의 수업코드 글자 크기 — 한 줄에 들어가도록 긴 코드는 줄인다.
+// 10자까지는 원래 크기, 그보다 길면 글자 수에 반비례해 줄인다(한글 등 넓은 글자는 1.6자로 센다).
+// 그래도 넘치면 카드 안에서 가로 스크롤된다(줄바꿈하지 않는다).
+function classCodeFontSize(code) {
+  const units = [...String(code || '')].reduce((n, ch) => n + (ch.codePointAt(0) > 0x2e80 ? 1.6 : 1), 0)
+  if (units <= 10) return 'clamp(2rem, 6vw, 3rem)'
+  const rem = Math.min(3, 42 / units).toFixed(3)
+  const vw = Math.min(6, 90 / units).toFixed(3)
+  return `clamp(1rem, ${vw}vw, ${rem}rem)`
+}
+
 function TeacherGate({ onAuth }) {
   const [pin, setPin] = useState('')
   const [error, setError] = useState('')
@@ -472,11 +483,13 @@ export default function TeacherApp() {
                   수업코드
                 </p>
                 <div style={{
-                  fontSize: 'clamp(2rem, 6vw, 3rem)',
+                  fontSize: classCodeFontSize(teacherCode),
                   fontWeight: 800,
                   letterSpacing: '0.08em',
                   color: 'var(--text)',
-                  wordBreak: 'break-all',
+                  whiteSpace: 'nowrap',
+                  overflowX: 'auto',
+                  maxWidth: '100%',
                   lineHeight: 1.2,
                 }}>
                   {teacherCode}

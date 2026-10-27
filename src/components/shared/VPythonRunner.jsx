@@ -62,6 +62,7 @@ export default function VPythonRunner({
   width = '100%',
   height = '300px',
   label,
+  loadingText,          // 로딩 중 문구 (선택, 기본 '3D 장면 로딩 중...')
   autoRun = true,
   onError,
   onReady,
@@ -331,7 +332,7 @@ export default function VPythonRunner({
               animation: 'spin 0.8s linear infinite',
             }} />
             <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '8px' }}>
-              3D 장면 로딩 중...
+              {loadingText || '3D 장면 로딩 중...'}
             </span>
             <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
           </div>

@@ -9,6 +9,7 @@ import { getAuthorizedTeam } from './teamAuth.js'
 import { verifyEvaluationProof } from './evaluationProof.js'
 import { MAX_TEAMS } from './session.js'
 import { getChallengeState, roundFilter, SUBMIT_GRACE_MS, SUBMIT_GRACE_ARRIVAL_MS } from './challengeState.js'
+import { BATTLE_CHALLENGES } from '../data/challenges-battle.js'
 
 const router = Router()
 
@@ -26,6 +27,14 @@ export function csvCell(value) {
 
 export function csvRow(values) {
   return values.map(csvCell).join(',')
+}
+
+// CSV 챌린지 칸 — "제목(id)". 프리셋에 없는 id(직접 만든 챌린지 등)는 id만 쓴다.
+const CHALLENGE_TITLES = new Map(BATTLE_CHALLENGES.map((c) => [c.id, c.title]))
+export function challengeLabel(challengeId) {
+  if (!challengeId) return ''
+  const title = CHALLENGE_TITLES.get(challengeId)
+  return title ? `${title}(${challengeId})` : challengeId
 }
 
 // 다운로드 파일 이름에 넣을 수 있는 글자만 남긴다
@@ -180,6 +189,64 @@ router.get('/dashboard/attempts/:sessionId/:teamId', requireTeacher, requireSess
     })),
   })
 })
+
+/**
+ * 전체 수업 종료 시 종합 결과 — 소켓(session:final-end)과 최종 CSV가 같은 집계를 쓴다.
+ * - 팀마다 챌린지별 최고 점수를 더해 totalScore를 만든다(시도하지 않은 챌린지는 0점, attempted:false).
+ * - 그 수업에서 시도가 하나도 없는 팀은 submitted:false, rank:null로 맨 뒤에 둔다.
+ *   순위 번호는 제출한 팀끼리만 매긴다(queryRankings와 같은 규칙).
+ * 반환: { results, challengeIds } — results[i].membersJson은 원본 JSON 문자열(호출 쪽이 형식에 맞게 푼다).
+ */
+export function computeFinalResults(db, sessionId) {
+  const teams = db.prepare('SELECT * FROM teams WHERE session_id = ?').all(sessionId)
+  const challengeIds = db.prepare(`
+    SELECT DISTINCT a.challenge_id
+    FROM attempts a JOIN teams t ON t.id = a.team_id
+    WHERE t.session_id = ?
+  `).all(sessionId).map((row) => row.challenge_id)
+  const bestStmt = db.prepare(`
+    SELECT prompt, score, evaluation
+    FROM attempts
+    WHERE team_id = ? AND challenge_id = ?
+    ORDER BY score DESC LIMIT 1
+  `)
+
+  const results = teams.map((team) => {
+    let totalScore = 0
+    let submitted = false
+    const challengeResults = challengeIds.map((challengeId) => {
+      const best = bestStmt.get(team.id, challengeId)
+      if (!best) return { challengeId, attempted: false, score: 0, prompt: '', feedback: '', strengths: [] }
+      submitted = true
+      totalScore += best.score
+      let evalData = {}
+      try { evalData = JSON.parse(best.evaluation || '{}') } catch {}
+      return {
+        challengeId,
+        attempted: true,
+        score: best.score,
+        prompt: best.prompt,
+        feedback: evalData.feedback || '',
+        strengths: Array.isArray(evalData.strengths) ? evalData.strengths : [],
+      }
+    })
+    return {
+      teamId: team.id,
+      teamName: team.name,
+      teamColor: team.color,
+      membersJson: team.members,
+      totalScore,
+      submitted,
+      challengeResults,
+    }
+  })
+
+  // 제출 팀 먼저(총점 내림차순), 미제출 팀은 맨 뒤. sort는 안정 정렬이라 동점은 등록 순서를 유지한다.
+  results.sort((a, b) => (b.submitted - a.submitted) || (b.totalScore - a.totalScore))
+  let rank = 0
+  for (const r of results) r.rank = r.submitted ? ++rank : null
+  return { results, challengeIds }
+}
 
 /**
  * 순위표 — 팀별 최고 시도 row 전체(점수·프롬프트·코드가 같은 row에서 온다).
@@ -415,7 +482,7 @@ router.get('/export/:sessionId', requireTeacher, requireSessionAccess('sessionId
   const header = csvRow(['team', 'session', 'challenge', 'score', 'prompt', 'created_at'])
   const csv = [
     header,
-    ...rows.map((r) => csvRow([r.team, r.session_number, r.challenge_id, r.score, r.prompt, r.created_at])),
+    ...rows.map((r) => csvRow([r.team, r.session_number, challengeLabel(r.challenge_id), r.score, r.prompt, r.created_at])),
   ].join('\n')
 
   res.setHeader('Content-Type', 'text/csv; charset=utf-8')
@@ -430,68 +497,24 @@ router.get('/export/:sessionId', requireTeacher, requireSessionAccess('sessionId
 router.get('/export/final/:sessionId', requireTeacher, requireSessionAccess('sessionId'), (req, res) => {
   const { sessionId } = req.params
 
-  const teams = req.db.prepare('SELECT * FROM teams WHERE session_id = ?').all(sessionId)
-  const challenges = req.db.prepare(`
-    SELECT DISTINCT a.challenge_id
-    FROM attempts a JOIN teams t ON t.id = a.team_id
-    WHERE t.session_id = ?
-  `).all(sessionId)
-
-  const results = teams.map(team => {
-    let totalScore = 0
-    const perChallenge = []
-
-    for (const { challenge_id } of challenges) {
-      const best = req.db.prepare(`
-        SELECT prompt, score, evaluation
-        FROM attempts
-        WHERE team_id = ? AND challenge_id = ?
-        ORDER BY score DESC LIMIT 1
-      `).get(team.id, challenge_id)
-
-      if (best) {
-        totalScore += best.score
-        let evalData = {}
-        try { evalData = JSON.parse(best.evaluation || '{}') } catch {}
-        perChallenge.push({
-          challengeId: challenge_id,
-          score: best.score,
-          prompt: best.prompt,
-          feedback: evalData.feedback || '',
-          strengths: (evalData.strengths || []).join('; '),
-        })
-      } else {
-        perChallenge.push({
-          challengeId: challenge_id,
-          score: 0,
-          prompt: '',
-          feedback: '',
-          strengths: '',
-        })
-      }
-    }
-
-    return {
-      name: team.name,
-      members: parseMemberList(team.members).join(', '),
-      totalScore,
-      perChallenge,
-    }
-  })
-
-  results.sort((a, b) => b.totalScore - a.totalScore)
+  const { results } = computeFinalResults(req.db, sessionId)
 
   // CSV 행 생성 (팀 × 챌린지)
+  // 미제출 팀(시도 0건)은 순위 칸에 "미제출"을 적고 맨 뒤에 둔다. 챌린지 칸은 "제목(id)".
   const header = csvRow(['순위', '팀명', '팀원', '총점', '챌린지', '챌린지점수', '프롬프트', '피드백', '장점'])
   const rows = []
-  results.forEach((team, idx) => {
-    const rank = idx + 1
-    for (const ch of team.perChallenge) {
-      rows.push(csvRow([rank, team.name, team.members, team.totalScore, ch.challengeId, ch.score, ch.prompt, ch.feedback, ch.strengths]))
+  results.forEach((team) => {
+    const rank = team.submitted ? team.rank : '미제출'
+    const members = parseMemberList(team.membersJson).join(', ')
+    for (const ch of team.challengeResults) {
+      rows.push(csvRow([
+        rank, team.teamName, members, team.totalScore, challengeLabel(ch.challengeId),
+        ch.score, ch.prompt, ch.feedback, ch.strengths.join('; '),
+      ]))
     }
     // 챌린지가 없는 경우 팀 정보만
-    if (team.perChallenge.length === 0) {
-      rows.push(csvRow([rank, team.name, team.members, team.totalScore, '', '', '', '', '']))
+    if (team.challengeResults.length === 0) {
+      rows.push(csvRow([rank, team.teamName, members, team.totalScore, '', '', '', '', '']))
     }
   })
 

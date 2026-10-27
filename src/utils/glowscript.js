@@ -29,6 +29,11 @@ function getBase() {
   return window.location.origin
 }
 
+// 라이브러리 URL 버전 쿼리 — 서버가 /lib/glowscript/*를 1년 immutable 캐시로 주므로
+// 파일 내용이 바뀌면 이 값(vite.config.js가 빌드 때 넣는 내용 해시)이 바뀌어 캐시가 무효화된다.
+// Vite를 거치지 않는 실행(노드 테스트)에서는 고정 문자열을 쓴다.
+const LIB_VERSION = typeof __GLOWSCRIPT_LIB_VERSION__ !== 'undefined' ? __GLOWSCRIPT_LIB_VERSION__ : '2026-10-27'
+
 // 장면 구성에 허용하는 최대 시간(ms). 정지 장면은 보통 수십 ms 안에 끝난다.
 export const LOOP_BUDGET_MS = 3000
 const LOOP_ERROR_TAG = '__GS_LOOP_TIMEOUT__'
@@ -397,12 +402,12 @@ export function buildGlowScriptHTML(code) {
 </head>
 <body>
 <div id="glowscript" class="glowscript">
-<link type="text/css" href="${base}/lib/glowscript/jquery-ui.custom.css" rel="stylesheet" />
-<link type="text/css" href="${base}/lib/glowscript/ide.css" rel="stylesheet" />
-<script type="text/javascript" src="${base}/lib/glowscript/jquery.min.js"><\/script>
-<script type="text/javascript" src="${base}/lib/glowscript/jquery-ui.custom.min.js"><\/script>
-<script type="text/javascript" src="${base}/lib/glowscript/glow.3.2.min.js"><\/script>
-<script type="text/javascript" src="${base}/lib/glowscript/RSrun.3.2.min.js"><\/script>
+<link type="text/css" href="${base}/lib/glowscript/jquery-ui.custom.css?v=${LIB_VERSION}" rel="stylesheet" />
+<link type="text/css" href="${base}/lib/glowscript/ide.css?v=${LIB_VERSION}" rel="stylesheet" />
+<script type="text/javascript" src="${base}/lib/glowscript/jquery.min.js?v=${LIB_VERSION}"><\/script>
+<script type="text/javascript" src="${base}/lib/glowscript/jquery-ui.custom.min.js?v=${LIB_VERSION}"><\/script>
+<script type="text/javascript" src="${base}/lib/glowscript/glow.3.2.min.js?v=${LIB_VERSION}"><\/script>
+<script type="text/javascript" src="${base}/lib/glowscript/RSrun.3.2.min.js?v=${LIB_VERSION}"><\/script>
 <script type="text/javascript"><!--//--><![CDATA[//><!--
 /* ── 블록 2: 실행 블록 (AI 생성 코드 포함) ─────────────────────────────── */
 ;(function() {

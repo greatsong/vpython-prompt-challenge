@@ -93,14 +93,18 @@ export default function SessionController({ sessionId, onFinalEnd, onAuthExpired
     socket.on('connect', rejoin)
 
     // 진행 중 챌린지 복구 — 새로고침·재접속 시 서버가 현재 라운드를 되돌려준다
-    socket.on('challenge:started', ({ challengeId, timeLimit, resumed } = {}) => {
+    socket.on('challenge:started', ({ challengeId, timeLimit, resumed, challenge } = {}) => {
       if (!resumed) return
       const c = BATTLE_CHALLENGES.find(ch => ch.id === challengeId)
       if (!c) return
       setSelectedId(c.id)
       selectedIdRef.current = c.id
       // 같은 챌린지면 다시 넣지 않는다 (대시보드의 목표 장면이 다시 로드되지 않도록)
-      if (useSessionStore.getState().currentChallenge?.id !== c.id) setChallenge(c)
+      // 서버가 목표 코드를 함께 보내면 실어 둔다. 대시보드가 상세 조회 없이 목표 장면을 바로 만든다
+      if (useSessionStore.getState().currentChallenge?.id !== c.id) {
+        const code = challenge && challenge.id === c.id && typeof challenge.code === 'string' ? challenge.code : ''
+        setChallenge(code ? { ...c, code } : c)
+      }
       setStatus('running')
       setError('')
       if (timeLimit > 0) startTimer(timeLimit)

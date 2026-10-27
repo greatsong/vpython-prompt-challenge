@@ -251,14 +251,29 @@ try {
     check(`#7 challenge:start 거부 — ${label}`, res?.ok === false, S(res))
   }
   let started = waitEvent(team1, 'challenge:started')
+  const specStarted = waitEvent(spectator, 'challenge:started')
   let res = await emitAck(teacher, 'challenge:start', { sessionId, challengeId: 'battle-01', timeLimit: 60 })
-  check('#7 challenge:start 정상(60초)', res?.ok === true && !!(await started), S(res))
+  const st = await started
+  check('#7 challenge:start 정상(60초)', res?.ok === true && !!st, S(res))
+  // 시작 이벤트에 챌린지 정보(목표 코드·제목·레벨)를 실어 팀 화면이 상세 조회를 건너뛰게 한다.
+  // 상세 API(무인증)와 같은 객체여야 노출 범위가 늘지 않는다
+  const detail = await http('/api/challenges/battle-01')
+  check('PERF challenge:started payload에 challenge.code·title·level 포함',
+    st?.challenge?.id === 'battle-01' && typeof st.challenge.code === 'string' && st.challenge.code.length > 0
+      && typeof st.challenge.title === 'string' && st.challenge.title.length > 0 && Number.isInteger(st.challenge.level),
+    S(st))
+  check('PERF challenge:started의 challenge = GET /api/challenges/:id 응답(노출 범위 동일)',
+    detail.status === 200 && JSON.stringify(st?.challenge) === JSON.stringify(detail.data), S([st?.challenge, detail.data]))
+  const sst = await specStarted
+  check('PERF 관람 화면도 같은 challenge payload 수신', sst?.challenge?.code === st?.challenge?.code, S(sst))
   // 재입장 리플레이
   const team1b = await connect()
   const replay = waitEvent(team1b, 'challenge:started')
   await emitAck(team1b, 'team:join', { teamId: t1.data.teamId, teamToken: t1.data.teamToken })
   const rp = await replay
   check('#10 재입장 시 진행 중 챌린지 리플레이', rp && rp.resumed === true && rp.challengeId === 'battle-01', S(rp))
+  check('PERF 재입장 리플레이(resumed)에도 challenge.code·title 포함',
+    rp?.challenge?.id === 'battle-01' && rp.challenge.code === detail.data?.code && rp.challenge.title === detail.data?.title, S(rp))
 
   // ── 진행 중 결과 공개 → challenge:ended도 방송 (#3), 종료는 한 번만 (#21) ──────
   let endedCount = 0
@@ -432,6 +447,27 @@ try {
     const rows = revealed?.rankings || []
     check('S3 결과 공개: 제출 팀 rank 1·submitted true, 미제출 팀 submitted false·rank null·맨 뒤',
       rows.length === 2 && rows[0].submitted === true && rows[0].rank === 1 && rows[1].submitted === false && rows[1].rank === null, S(rows))
+
+    // S4 최종 결과: 시도가 없는 팀은 submitted:false·rank null·맨 뒤, 제출 팀끼리만 순위 (소켓·CSV 같은 규칙)
+    const rc = (await http('/api/session/register', { method: 'POST', body: { teacherCode: 'adv-trainee', students: [{ studentNumber: 'T03', studentName: '나중제출' }] } })).data
+    await http('/api/attempts', { method: 'POST', token: tk, body: { teamId: rc.teamId, sessionNumber: 1, challengeId: 'battle-04', prompt: '늦게 제출', generatedCode: 'box()', score: 25 } })
+    const finalP = waitEvent(ts, 'session:final-ended', 1500)
+    const fin = await emitAck(ts, 'session:final-end', { sessionId: sid })
+    const fr = (await finalP)?.rankings || []
+    check('S4 최종 결과 소켓: 제출 2팀 rank 1·2(총점순), 미제출 팀 submitted false·rank null·맨 뒤',
+      fin?.ok === true && fr.length === 3 &&
+      fr[0].teamId === ra.teamId && fr[0].submitted === true && fr[0].rank === 1 && fr[0].totalScore === 40 &&
+      fr[1].teamId === rc.teamId && fr[1].submitted === true && fr[1].rank === 2 && fr[1].totalScore === 25 &&
+      fr[2].submitted === false && fr[2].rank === null && fr[2].totalScore === 0 &&
+      fr[2].challengeResults.every((cr) => cr.attempted === false), S(fr.map((r) => [r.teamName, r.submitted, r.rank, r.totalScore])))
+    const finalCsv = await http(`/api/export/final/${sid}`, { token: tk })
+    const csvLines = typeof finalCsv.data === 'string' ? finalCsv.data.replace(/^\uFEFF/, '').split('\n') : []
+    check('S4 최종 CSV: 순위 1·2, 미제출 팀은 순위 칸 "미제출"·맨 뒤, 챌린지 칸 "제목(id)"',
+      finalCsv.status === 200 && csvLines.length === 4 &&
+      csvLines[1].startsWith('"1",') && csvLines[2].startsWith('"2",') && csvLines[3].startsWith('"미제출",') &&
+      csvLines[1].includes('"버섯(battle-04)"'), S(csvLines))
+    const roundCsv = await http(`/api/export/${sid}`, { token: tk })
+    check('S4 챌린지 CSV: 챌린지 칸 "제목(id)"', roundCsv.status === 200 && typeof roundCsv.data === 'string' && roundCsv.data.includes('"버섯(battle-04)"'), S(roundCsv.data))
 
     // 연수 입장 실패 제한은 기본 30회 — 오타 10번이 정확한 코드 입장을 막지 않는다
     for (let i = 0; i < 10; i++) await http('/api/auth/training', { method: 'POST', body: { code: 'wrong-code-' + i } })

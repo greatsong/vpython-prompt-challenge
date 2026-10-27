@@ -813,7 +813,7 @@ function HowtoSection() {
         <FeatureCard icon="📊" color="#C2366B" title="CSV 내보내기" desc="팀별 점수와 프롬프트를 다운로드" />
         <FeatureCard icon="💡" color="#A0522D" title="힌트 전송" desc="막히는 팀에게 실시간으로 힌트 전송" />
         <FeatureCard icon="⏹️" color="#C53030" title="시작/마감 제어" desc="챌린지별 시작과 제출 마감을 명시적으로 제어" />
-        <FeatureCard icon="🏆" color="#7B4BB7" title="결과 공개" desc="마감 뒤에만 표시, 미제출 팀 0점 포함 순위 공개" />
+        <FeatureCard icon="🏆" color="#7B4BB7" title="결과 공개" desc="마감 뒤에만 표시, 미제출 팀은 '미제출'로 표시(순위 제외)" />
       </div>
     </div>
   )
@@ -944,7 +944,7 @@ function TipsSection() {
           <TroubleshootItem icon="🔋" problem="학생 기기 없음" solution="팀 1대로 통합 진행" />
           <TroubleshootItem icon="👥" problem="팀 정원(40팀) 초과" solution="학생 화면에 정원 초과 안내가 뜨고 관람 모드로 전환됩니다" />
           <TroubleshootItem icon="🕐" problem="중간에 입장한 학생" solution="현재 진행 중인 챌린지가 자동 전달됩니다" />
-          <TroubleshootItem icon="📊" problem="미제출 팀 점수" solution="제출하지 않은 팀은 자동 0점 처리됩니다" />
+          <TroubleshootItem icon="📊" problem="미제출 팀 점수" solution="제출하지 않은 챌린지는 0점으로 계산되고, 한 번도 제출하지 않은 팀은 '미제출'로 표시됩니다" />
         </div>
       </Card>
     </div>
@@ -1072,11 +1072,11 @@ function FAQSection() {
     { q: '한 세션에서 여러 챌린지를 진행할 수 있나요?', a: <Rich text={GUIDE_TEXT[53]} /> },
     {
       q: '수업 중간에 학생이 들어오면 어떻게 되나요?',
-      a: '중간에 접속한 학생도 현재 진행 중인 챌린지가 자동으로 전달됩니다. 이전 챌린지는 미제출(0점)으로 처리됩니다.',
+      a: '중간에 접속한 학생도 현재 진행 중인 챌린지가 자동으로 전달됩니다. 이전 챌린지는 제출하지 않은 것으로 0점 계산됩니다.',
     },
     {
       q: '문제를 제출하지 않은 팀은 어떻게 되나요?',
-      a: '미제출 팀은 순위에서 0점으로 표시됩니다. "1문제만 풀고 1등" 같은 상황은 발생하지 않습니다.',
+      a: '한 번도 제출하지 않은 팀은 \'미제출\'로 표시되고 순위에서 제외됩니다. 일부 챌린지만 제출한 팀은 제출하지 않은 챌린지가 0점으로 계산됩니다. "1문제만 풀고 1등" 같은 상황은 발생하지 않습니다.',
     },
   ]
 
