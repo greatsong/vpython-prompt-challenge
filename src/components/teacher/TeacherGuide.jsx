@@ -582,9 +582,9 @@ function TryItSection() {
           {/* CT 점수 바 */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '16px' }}>
             {[
-              ['decomposition', '분해'],
+              ['decomp', '분해'],
               ['pattern', '패턴인식'],
-              ['abstraction', '추상화'],
+              ['abstract', '추상화'],
               ['algorithm', '알고리즘'],
             ].map(([key, label]) => (
               <div key={key}>

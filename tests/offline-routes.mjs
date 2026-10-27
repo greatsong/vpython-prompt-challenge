@@ -184,6 +184,23 @@ const startRound = (challengeId, startedAt = Date.now(), timeLimit = 180) =>
     .run(SID, challengeId, timeLimit, startedAt)
 const endRound = (endedAt = Date.now()) => db.prepare('UPDATE active_challenges SET ended_at = ? WHERE session_id = ?').run(endedAt, SID)
 
+// 최종 점검 B1: 분석 2종은 교사 전용 — 팀 토큰은 챌린지 상태와 무관하게 403, AI 호출 없음
+before = calls.length
+r = await teamPost('/api/analyze-problem', { code: 'sphere()', title: 't' })
+check('B1 팀 토큰 analyze-problem → 403, AI 호출 없음', r.status === 403 && calls.length === before, S(r))
+r = await teamPost('/api/evaluate-problem-quality', { problemCode: 'sphere()', solverPrompt: '공', solverScore: 1 })
+check('B1 팀 토큰 evaluate-problem-quality → 403, AI 호출 없음', r.status === 403 && calls.length === before, S(r))
+queue = [text('{"estimated_difficulty":"기본","ct_elements_detected":[],"prompt_difficulty":"★","suggestion":"ok"}')]
+r = await request('POST', '/api/analyze-problem', { teacher: false, body: { code: 'sphere()' }, headers: { 'x-teacher-token': issueTeacherToken(SCOPE_TRAINING) } })
+check('B1 연수 교사 토큰 analyze-problem → 200 (교사 전용이어도 연수 교사는 허용)', r.status === 200 && calls.length === before + 1, S(r))
+startRound('battle-01')
+before = calls.length
+r = await teamPost('/api/analyze-problem', { code: 'sphere()' })
+check('B1 진행 중 라운드에도 팀 토큰 analyze-problem → 403, AI 호출 없음', r.status === 403 && calls.length === before, S(r))
+endRound()
+db.prepare('DELETE FROM active_challenges WHERE session_id = ?').run(SID)
+before = calls.length
+
 before = calls.length
 r = await teamPost('/api/generate', { prompt: '공' })
 check('#2 진행 중 챌린지 없음 → 팀 generate 409', r.status === 409 && r.data.reason === 'no_active_challenge' && calls.length === before, S(r))

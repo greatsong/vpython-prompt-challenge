@@ -1159,10 +1159,23 @@ ${studentPromptBlock}`
   }
 })
 
+// 문제 분석 2종(analyze-problem·evaluate-problem-quality)은 교사 전용이다.
+// 학생 화면은 이 두 경로를 부르지 않는다. 예전에는 팀 토큰도 통과해, 수업코드만 알면 공개 등록으로 팀을 늘려
+// 챌린지 진행 여부와 관계없이(시작 전·마감 뒤에도) 유료 호출을 팀 수 × 분당 30회까지 낼 수 있었다.
+function authorizeTeacherOnlyAI(req, res) {
+  const auth = authorizeAI(req, res)
+  if (!auth) return null
+  if (auth.role !== 'teacher') {
+    res.status(403).json({ error: '교사 전용 기능입니다.' })
+    return null
+  }
+  return auth
+}
+
 // ── 문제 품질 분석 (Session 4) ────────────────────────────────────────────────
 router.post('/analyze-problem', async (req, res) => {
   const { code, title, difficulty } = req.body
-  const auth = authorizeAI(req, res)
+  const auth = authorizeTeacherOnlyAI(req, res)
   if (!auth || !checkRateLimit(req, res, auth)) return
   if (!ensureTextLimit(res, 'code', code, MAX_CODE_LENGTH)) return
   const signal = clientAbortSignal(res)
@@ -1205,7 +1218,7 @@ ${code}
 // ── 출제팀 평가 (Session 5) ───────────────────────────────────────────────
 router.post('/evaluate-problem-quality', async (req, res) => {
   const { problemCode, solverPrompt, solverScore } = req.body
-  const auth = authorizeAI(req, res)
+  const auth = authorizeTeacherOnlyAI(req, res)
   if (!auth || !checkRateLimit(req, res, auth)) return
   if (!ensureTextLimit(res, 'problemCode', problemCode, MAX_CODE_LENGTH)) return
   if (!ensureTextLimit(res, 'solverPrompt', solverPrompt, MAX_PROMPT_LENGTH)) return
