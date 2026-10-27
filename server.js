@@ -32,7 +32,7 @@ import {
   SCOPE_ADMIN,
   SCOPE_TRAINING,
 } from './src/api/teacherAuth.js'
-import { getAuthorizedTeam, findTeamByToken } from './src/api/teamAuth.js'
+import { getAuthorizedTeam, findTeamByToken, getTeamToken, isTeamTokenOfEndedSession } from './src/api/teamAuth.js'
 import { hasEvaluationSecret } from './src/api/evaluationProof.js'
 import { migrateDb } from './src/api/migrate.js'
 import { getChallenge } from './src/server-data/challenges.js'
@@ -280,6 +280,10 @@ app.get('/api/team/:teamId', (req, res) => {
   const teacherAuthed = !!teacherAuth && canAccessTeam(db, teacherAuth, req.params.teamId)
   const teamAuthed = getAuthorizedTeam(req, req.params.teamId)
   if (!teacherAuthed && !teamAuthed) {
+    // 토큰은 맞는데 수업이 끝났으면 401 대신 종료 사실만 알린다 (팀 화면이 '수업 종료' 안내로 가도록, 팀 정보는 주지 않는다)
+    if (isTeamTokenOfEndedSession(db, req.params.teamId, getTeamToken(req))) {
+      return res.json({ ended: true })
+    }
     return res.status(401).json({ error: '팀 인증이 필요합니다. QR 코드 또는 등록 화면에서 다시 입장해주세요.' })
   }
 
@@ -311,7 +315,17 @@ app.get('/api/network/ip', async (req, res) => {
 // 서버가 죽었다 살아나도 DB에서 상태를 복원하고 자동 종료 타이머를 다시 건다.
 // 마감하면 행을 지우지 않고 ended_at을 남긴다 — 팀 경로 API(src/api/challengeState.js)가
 // "지금 진행 중인가"와 "마감 직후 유예 안인가"를 이 값으로 판정한다.
-const activeChallenge = {} // { sessionId: { challengeId, timeLimit, startedAt } } — 진행 중인 것만
+const activeChallenge = {} // { sessionId: { challengeId, timeLimit, startedAt, hints? } } — 진행 중인 것만
+// 진행 중인 라운드에 교사가 보낸 힌트 — 재접속·새로고침한 팀에게 challenge:started 리플레이로 다시 보낸다.
+// 라운드(챌린지 + 시작 시각)가 바뀌면 버린다. 메모리에만 두므로 서버가 다시 시작되면 사라진다.
+const challengeHints = {} // { sessionId: { challengeId, startedAt, hints: string[] } }
+const MAX_STORED_HINTS = 10
+
+function hintsForRound(sessionId, ac) {
+  const h = challengeHints[sessionId]
+  if (!h || !ac || h.challengeId !== ac.challengeId || h.startedAt !== ac.startedAt) return []
+  return h.hints.slice()
+}
 const challengeTimers = {} // { sessionId: setTimeout ID }
 
 const upsertActiveChallengeStmt = db.prepare(`
@@ -362,6 +376,7 @@ function endActiveChallenge(sessionId, endedAt = Date.now()) {
   }
   const hadCache = !!activeChallenge[sessionId]
   delete activeChallenge[sessionId]
+  delete challengeHints[sessionId] // 힌트는 진행 중인 라운드에만 다시 보낸다
   try {
     const changed = markChallengeEndedStmt.run(endedAt, String(sessionId)).changes > 0
     endOpenRoundsStmt.run(endedAt, String(sessionId))
@@ -545,6 +560,8 @@ io.on('connection', (socket) => {
       startedAt: ac.startedAt,
       resumed: true,
       challenge: challengeForBroadcast(ac.challengeId),
+      // 이 라운드에 이미 공개된 힌트(보낸 순서대로) — 끊긴 사이에 보낸 힌트도 다시 보인다
+      hints: hintsForRound(sessionId, ac),
     })
     return true
   }
@@ -709,6 +726,13 @@ io.on('connection', (socket) => {
     }
 
     const team = findTeamByToken(db, teamId, teamToken)
+    if (!team && isTeamTokenOfEndedSession(db, teamId, teamToken)) {
+      // 토큰은 맞지만 수업이 끝났다 — 인증 실패가 아니라 수업 종료로 알린다
+      const error = '수업이 종료되었습니다'
+      socket.emit('team:join:error', { error, reason: 'session_unavailable' })
+      reply?.({ ok: false, error, sessionEnded: true })
+      return
+    }
     if (!team) {
       const error = '팀 인증이 필요합니다. QR 코드 또는 등록 화면에서 다시 입장해주세요.'
       console.warn(`[Socket] 팀 입장 거부: team=${String(teamId).slice(0, 20)}, socket=${socket.id}`)
@@ -799,7 +823,18 @@ io.on('connection', (socket) => {
       reply?.({ ok: false, error: '힌트 내용이 필요합니다' })
       return
     }
-    io.to(`session:${sessionId}`).emit('challenge:hint', { hint: hint.slice(0, MAX_HINT_LENGTH) })
+    const text = hint.slice(0, MAX_HINT_LENGTH)
+    // 진행 중인 라운드가 있으면 그 라운드의 힌트로 저장한다 (같은 힌트를 다시 보내면 한 번만 남긴다)
+    const ac = getActiveChallenge(sessionId)
+    if (ac) {
+      let h = challengeHints[sessionId]
+      if (!h || h.challengeId !== ac.challengeId || h.startedAt !== ac.startedAt) {
+        h = { challengeId: ac.challengeId, startedAt: ac.startedAt, hints: [] }
+        challengeHints[sessionId] = h
+      }
+      if (!h.hints.includes(text)) h.hints = [...h.hints, text].slice(-MAX_STORED_HINTS)
+    }
+    io.to(`session:${sessionId}`).emit('challenge:hint', { hint: text })
     reply?.({ ok: true })
   }))
 

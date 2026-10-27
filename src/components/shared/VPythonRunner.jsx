@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { buildGlowScriptHTML, checkCodeSafety, ANIMATION_GUIDE } from '../../utils/glowscript.js'
+import { buildGlowScriptHTML, checkCodeSafety, ANIMATION_GUIDE, LOOP_BUDGET_MS } from '../../utils/glowscript.js'
 
 // 탭이 숨겨져 있는지 (다른 탭을 보고 있거나 창이 가려진 상태)
 function isPageHidden() {
@@ -37,6 +37,9 @@ const NON_RETRYABLE = new Set(['syntax', 'animation', 'loop'])
 // watchdog: 이 시간 안에 iframe이 ready/error를 보내지 않으면 iframe을 제거한다.
 // 탭이 백그라운드(hidden)일 때는 브라우저가 타이머·렌더링을 늦추므로 시간을 재지 않는다.
 const WATCHDOG_MS = 8000
+// 라이브러리를 다 불러와 장면 구성(__main__)을 시작했다고 알려 오면(glowscript:running)
+// 루프 가드 상한(LOOP_BUDGET_MS)에 여유를 더한 만큼으로 늘린다 — 느린 PC에서 반복이 많은 정상 장면을 끊지 않도록
+const WATCHDOG_RUNNING_MS = LOOP_BUDGET_MS + 3000
 
 /**
  * VPythonRunner
@@ -68,6 +71,8 @@ export default function VPythonRunner({
   onReady,
 }) {
   const timerRef = useRef(null)
+  // 지금 걸려 있는 watchdog 대기 시간(ms) — 실행마다 WATCHDOG_MS로 시작하고, 장면 구성 시작 알림을 받으면 늘어난다
+  const watchdogMsRef = useRef(WATCHDOG_MS)
   const iframeRef = useRef(null)
   // status를 setTimeout 안에서 읽으면 클로저에 갇힌 옛 값을 보게 된다.
   // (이 때문에 타임아웃 판정이 엉뚱하게 동작했다)
@@ -132,15 +137,20 @@ export default function VPythonRunner({
   }, [applyStatus, clearWatchdog])
 
   // watchdog 시작 — 탭이 숨겨져 있으면 보류하고, 보이게 되면 visibilitychange에서 다시 건다
+  // 대기 시간은 watchdogMsRef(장면 구성 시작 알림을 받으면 늘어난다)를 따른다.
   const armWatchdog = useCallback(() => {
     clearWatchdog()
     if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
     timerRef.current = setTimeout(() => {
-      timerRef.current = null
-      if (statusRef.current === 'loading') {
-        reportError('timeout', 'timeout', { removeFrame: true })
-      }
-    }, WATCHDOG_MS)
+      // iframe과 같은 스레드에서 돌면 장면 구성이 끝난 직후 밀린 타이머가 ready 메시지보다 먼저 올 수 있다.
+      // 한 번 양보해 이미 도착한 메시지를 먼저 처리한 뒤 판정한다.
+      timerRef.current = setTimeout(() => {
+        timerRef.current = null
+        if (statusRef.current === 'loading') {
+          reportError('timeout', 'timeout', { removeFrame: true })
+        }
+      }, 100)
+    }, watchdogMsRef.current)
   }, [clearWatchdog, reportError])
 
   const run = useCallback((c) => {
@@ -169,6 +179,7 @@ export default function VPythonRunner({
     deferredCodeRef.current = null
     try {
       runIdRef.current += 1
+      watchdogMsRef.current = WATCHDOG_MS
       setFrame({ html: buildGlowScriptHTML(c), runId: runIdRef.current })
       armWatchdog()
     } catch (e) {
@@ -206,7 +217,13 @@ export default function VPythonRunner({
       const mine = iframeRef.current?.contentWindow
       if (!mine || e.source !== mine) return
 
-      if (e.data.type === 'glowscript:ready') {
+      if (e.data.type === 'glowscript:running') {
+        // 라이브러리 로딩은 끝났고 장면 구성 중이다 — 루프 가드가 먼저 판정하도록 watchdog을 늘린다
+        if (statusRef.current === 'loading') {
+          watchdogMsRef.current = WATCHDOG_RUNNING_MS
+          armWatchdog()
+        }
+      } else if (e.data.type === 'glowscript:ready') {
         // 숨겨진 상태에서 끝난 장면은 보이게 될 때 한 번 더 그린다 (rerunOnVisibleRef 유지)
         if (!isPageHidden()) rerunOnVisibleRef.current = false
         clearWatchdog()
@@ -223,7 +240,7 @@ export default function VPythonRunner({
 
     window.addEventListener('message', handleMessage)
     return () => window.removeEventListener('message', handleMessage)
-  }, [applyStatus, reportError, clearWatchdog])
+  }, [applyStatus, reportError, clearWatchdog, armWatchdog])
 
   useEffect(() => {
     if (autoRun && code) {

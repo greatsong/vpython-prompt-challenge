@@ -6,8 +6,8 @@
  * AI가 "튀어 오르게" 같은 움직임 요청에 while(true){ rate(100) ... } 코드를 만들면
  * 동기 함수 안에서 끝나지 않아 탭 전체가 멈췄다(같은 출처 iframe은 부모와 스레드를 공유한다).
  *   1) checkCodeSafety — 실행 전 정적 검사. 무한 루프·rate() 호출이 보이면 실행하지 않는다.
- *   2) instrumentLoops — 모든 for/while/do 본문 첫머리에 시간 검사(__gsLoopGuard)를 넣어
- *      정적 검사를 빠져나간 긴 루프도 몇 초 뒤 예외로 끊는다.
+ *   2) instrumentLoops — 모든 for/while/do 본문 첫머리에 횟수·시간 검사(__gsLoopGuard)를 넣어
+ *      정적 검사를 빠져나간 긴 루프도 예외로 끊는다(가드 호출 500만 회 또는 15초).
  *   3) sandbox="allow-scripts"(allow-same-origin 없음) — 출처를 분리해 부모 DOM·저장소에 손대지
  *      못하게 하고, 브라우저가 별도 프로세스에 둘 수 있게 한다. 러너의 watchdog이 iframe을 제거한다.
  *
@@ -34,8 +34,13 @@ function getBase() {
 // Vite를 거치지 않는 실행(노드 테스트)에서는 고정 문자열을 쓴다.
 const LIB_VERSION = typeof __GLOWSCRIPT_LIB_VERSION__ !== 'undefined' ? __GLOWSCRIPT_LIB_VERSION__ : '2026-10-27'
 
-// 장면 구성에 허용하는 최대 시간(ms). 정지 장면은 보통 수십 ms 안에 끝난다.
-export const LOOP_BUDGET_MS = 3000
+// 장면 구성(__main__)을 끊는 기준은 두 가지다. 둘 중 하나라도 넘으면 '반복이 끝나지 않음'으로 본다.
+//   1) 반복 횟수 — 루프 가드 호출 수. 기기 속도와 무관해 느린 PC에서도 정상 장면을 끊지 않는다.
+//      목표 장면 23개는 많아야 수백 회이고, 빈 무한 루프는 이 횟수에 1초 안팎이면 닿는다.
+//   2) 벽시계 — 반복 한 번이 아주 무거운 코드(객체를 대량으로 만드는 등)를 위한 상한.
+//      예전에는 벽시계 3초 하나만 써서 느린 PC에서 반복이 많은 정상 장면(블록 피라미드 등)이 끊길 수 있었다.
+export const LOOP_MAX_ITERATIONS = 5000000
+export const LOOP_BUDGET_MS = 15000
 const LOOP_ERROR_TAG = '__GS_LOOP_TIMEOUT__'
 
 // 움직이는 장면(애니메이션) 안내 문구 — 서버 필터와 같은 문구를 쓴다
@@ -313,10 +318,13 @@ export function buildGlowScriptHTML(code) {
   };
 
   // 루프 가드 — instrumentLoops가 모든 반복문 본문 첫머리에 이 호출을 넣는다.
-  // 장면 구성(__main__)이 LOOP_BUDGET_MS를 넘기면 예외로 끊어 탭이 멈추지 않게 한다.
+  // 장면 구성(__main__) 동안 가드 호출이 LOOP_MAX_ITERATIONS회를 넘거나 LOOP_BUDGET_MS가 지나면
+  // 예외로 끊어 탭이 멈추지 않게 한다. __main__ 밖(마감 시각 0)에서는 아무것도 하지 않는다.
   window.__gsLoopDeadline = 0;
+  window.__gsLoopCount = 0;
   window.__gsLoopGuard = function () {
-    if (window.__gsLoopDeadline && Date.now() > window.__gsLoopDeadline) {
+    if (!window.__gsLoopDeadline) return;
+    if (++window.__gsLoopCount > ${LOOP_MAX_ITERATIONS} || Date.now() > window.__gsLoopDeadline) {
       window.__gsLoopDeadline = 0;
       var err = new Error('${LOOP_ERROR_TAG}');
       err.__gsLoop = true;
@@ -425,7 +433,10 @@ function __main__() {
 ;$(function(){
   try {
     window.__context = { glowscript_container: $("#glowscript").removeAttr("id") };
+    window.__gsLoopCount = 0;
     window.__gsLoopDeadline = Date.now() + ${LOOP_BUDGET_MS};
+    // 장면 구성을 시작했다고 알린다 — 러너가 watchdog을 루프 가드 상한(LOOP_BUDGET_MS)에 맞춰 늘린다
+    try { window.parent.postMessage({ type: 'glowscript:running' }, '*'); } catch (err) { /* 무시 */ }
     __main__();
     window.__gsLoopDeadline = 0;
     // 부모 레이아웃이 늦게 잡히는 경우까지 대비해 몇 번 더 맞춘다

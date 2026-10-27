@@ -155,6 +155,26 @@ export default function ClassDashboard({ sessionId, onAuthExpired }) {
     if (data?.maxTeams) setMaxTeams(data.maxTeams)
   }
 
+  // 열려 있는 순위표를 지금 챌린지 기준으로 다시 읽는다 (재연결 때 — 끊긴 사이 제출이 순위에 반영되도록)
+  const refreshRankings = async () => {
+    const cid = challengeIdRef.current
+    const url = cid
+      ? `/api/dashboard/rankings/${sessionId}?challengeId=${cid}`
+      : `/api/dashboard/rankings/${sessionId}`
+    try {
+      const res = await teacherFetch(url)
+      if (res.status === 401) {
+        markAuthExpired()
+        return
+      }
+      if (!res.ok) return
+      const data = await res.json()
+      // 응답 사이에 챌린지가 바뀌었거나 순위표를 닫았으면 반영하지 않는다
+      if (challengeIdRef.current !== cid || !challengeRankingsRef.current) return
+      if (Array.isArray(data?.rankings)) setChallengeRankings(data.rankings)
+    } catch { /* 기존 순위표를 유지한다 */ }
+  }
+
   const downloadCsv = async (url, filename) => {
     let res
     try {
@@ -219,7 +239,19 @@ export default function ClassDashboard({ sessionId, onAuthExpired }) {
     join()
 
     // 재연결 시 방 재참여 (배포/네트워크 끊김 후 복구)
-    socket.on('connect', join)
+    // 끊긴 사이에 온 제출·등록 이벤트는 다시 오지 않으므로 팀 현황과 (열려 있으면) 순위표를 다시 읽는다.
+    // 첫 연결은 위의 챌린지 효과가 이미 loadTeams를 불렀으므로 건너뛴다.
+    let connectedOnce = socket.connected
+    const onConnect = () => {
+      join()
+      if (!connectedOnce) {
+        connectedOnce = true
+        return
+      }
+      loadTeams()
+      if (challengeRankingsRef.current) refreshRankings()
+    }
+    socket.on('connect', onConnect)
 
     // 소켓 이벤트에서 loadTeams 호출 시 challengeIdRef로 최신 값 사용
     // team:submitted는 { teamId, score }만 담는다 — 상세 평가는 loadTeams로 다시 읽는다

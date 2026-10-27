@@ -86,6 +86,8 @@ export default function TeamApp() {
 
   // 현재 라운드 식별자 — 같은 챌린지를 다시 시작해도 새 라운드로 구분된다
   const [roundStartedAt, setRoundStartedAt] = useState(null)
+  // 재접속·새로고침 때 서버가 다시 보내 준 이 라운드의 힌트 — { startedAt, hints }
+  const [replayedHints, setReplayedHints] = useState(null)
   // 수업이 끝난 뒤(최종 결과 화면)에는 재접속 입장 실패로 화면을 옮기지 않는다
   const sessionClosedRef = useRef(false)
 
@@ -116,6 +118,11 @@ export default function TeamApp() {
         }
         if (res.ok) {
           const team = await res.json()
+          // 토큰은 맞는데 수업이 이미 끝났다 (서버가 401 대신 ended로 알려 준다)
+          if (team?.ended) {
+            goRejoin(SESSION_ENDED_NOTICE)
+            return
+          }
           // 세션 상태 확인 — ended면 /join으로 리다이렉트
           const sessionRes = await fetch(`/api/session/${team.session_id}`)
           if (sessionRes.ok) {
@@ -185,7 +192,7 @@ export default function TeamApp() {
       'team:join',
       { sessionId: myTeam.session_id, teamId: myTeam.id, teamToken: getTeamToken(myTeam.id) },
       (res) => {
-        if (res && res.ok === false && !sessionClosedRef.current) goRejoin(REJOIN_NOTICE)
+        if (res && res.ok === false && !sessionClosedRef.current) goRejoin(res.sessionEnded ? SESSION_ENDED_NOTICE : REJOIN_NOTICE)
       }
     )
     if (socket.connected) join()
@@ -196,8 +203,10 @@ export default function TeamApp() {
       goRejoin(reason === 'session_unavailable' ? SESSION_ENDED_NOTICE : REJOIN_NOTICE)
     })
 
-    socket.on('challenge:started', ({ challengeId, timeLimit, startedAt, challenge }) => {
+    socket.on('challenge:started', ({ challengeId, timeLimit, startedAt, challenge, hints }) => {
       latestChallengeIdRef.current = challengeId
+      // 이 라운드에 이미 공개된 힌트(재접속 리플레이에만 담겨 온다). 새 라운드 시작이면 빈 배열이다
+      setReplayedHints({ startedAt: startedAt ?? null, hints: Array.isArray(hints) ? hints.filter((h) => typeof h === 'string' && h) : [] })
       // 진행 중인 챌린지가 있으면(재접속 복원 포함) 앞서 공개된 결과는 더 이상 현재 화면이 아니다
       clearRevealed(myTeam.session_id)
       setChallengeEnded(false)
@@ -404,6 +413,7 @@ export default function TeamApp() {
           remainingSeconds={remainingSeconds}
           finalResults={finalResults}
           roundStartedAt={roundStartedAt}
+          replayedHints={replayedHints}
         />
       </main>
 

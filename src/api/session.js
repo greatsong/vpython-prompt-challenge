@@ -429,6 +429,11 @@ router.post('/register', (req, res) => {
   for (const [event, payload] of events) {
     req.io?.to(`session:${outcome.sessionId}:teacher`).emit(event, payload)
   }
+  // 수업 방 전체(관람 화면 포함)에는 팀 목록이 바뀌었다는 사실만 알린다 — 학생 실명은 교사 방에만 간다.
+  // 관람 화면은 이 이벤트를 받아 공개 현황을 다시 읽고 'N팀 참여 중'을 갱신한다.
+  if (events.length > 0) {
+    req.io?.to(`session:${outcome.sessionId}`).emit('team:registered', {})
+  }
   res.json(outcome)
 })
 

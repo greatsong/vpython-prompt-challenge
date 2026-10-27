@@ -118,7 +118,7 @@ function pruneOtherRounds(currentKey) {
   } catch { /* ignore */ }
 }
 
-export default function BattleMode({ team, socket, rankings, challengeEnded, remainingSeconds, finalResults, roundStartedAt }) {
+export default function BattleMode({ team, socket, rankings, challengeEnded, remainingSeconds, finalResults, roundStartedAt, replayedHints }) {
   const { currentChallenge } = useSessionStore()
   const { attempts, addAttempt } = useTeamStore()
   const [prompt, setPrompt] = useState('')
@@ -128,7 +128,8 @@ export default function BattleMode({ team, socket, rankings, challengeEnded, rem
   const [loading, setLoading] = useState(false)
   const [loadingPhase, setLoadingPhase] = useState('') // 'generate' | 'evaluate' | ''
   const [latestEval, setLatestEval] = useState(null)
-  const [hint, setHint] = useState('')
+  // 이 라운드에 받은 힌트 목록 (보낸 순서, 같은 문구는 한 번만)
+  const [hints, setHints] = useState([])
   // 3D 렌더링 실패 안내 — { kind, guide, exhausted }
   // 채점 실패와는 별개다. 점수를 이미 받았다면 그대로 남겨둔다.
   const [renderError, setRenderError] = useState(null)
@@ -153,7 +154,10 @@ export default function BattleMode({ team, socket, rankings, challengeEnded, rem
   useEffect(() => {
     const s = socketInstance
     if (!s) return
-    const handler = ({ hint: h }) => setHint(h)
+    const handler = ({ hint: h } = {}) => {
+      if (typeof h !== 'string' || !h) return
+      setHints((prev) => (prev.includes(h) ? prev : [...prev, h]))
+    }
     s.on('challenge:hint', handler)
     return () => s.off('challenge:hint', handler)
   }, [socketInstance])
@@ -171,7 +175,7 @@ export default function BattleMode({ team, socket, rankings, challengeEnded, rem
   useEffect(() => {
     retryRef.current = 0
     setRenderError(null)
-    setHint('')
+    setHints([])
     setSubmitError(null)
     pendingSubmitRef.current = null
     submittedPromptRef.current = ''
@@ -203,6 +207,18 @@ export default function BattleMode({ team, socket, rankings, challengeEnded, rem
       setRestoredCode(false)
     }
   }, [currentRoundKey])
+
+  // 재접속·새로고침 때 서버가 다시 보내 준 힌트를 합친다 — 위의 라운드 초기화 다음에 실행돼야 지워지지 않는다
+  useEffect(() => {
+    if (!currentRoundKey || !replayedHints || !Array.isArray(replayedHints.hints)) return
+    if ((replayedHints.startedAt ?? null) !== (roundStartedAt ?? null)) return
+    if (replayedHints.hints.length === 0) return
+    setHints((prev) => {
+      const next = [...prev]
+      for (const h of replayedHints.hints) if (!next.includes(h)) next.push(h)
+      return next.length === prev.length ? prev : next
+    })
+  }, [currentRoundKey, replayedHints, roundStartedAt])
 
   // 상태 변경 시 sessionStorage에 저장
   useEffect(() => {
@@ -776,11 +792,11 @@ export default function BattleMode({ team, socket, rankings, challengeEnded, rem
             3D 장면을 관찰하고 묘사하세요
           </p>
         )}
-        {hint && (
-          <p style={{ marginTop: '8px', fontSize: '0.875rem', color: 'var(--warning-text)', background: 'var(--warning-bg)', padding: '6px 10px', borderRadius: 'var(--radius)' }}>
-            💡 힌트: {hint}
+        {hints.map((h, i) => (
+          <p key={i} style={{ marginTop: '8px', fontSize: '0.875rem', color: 'var(--warning-text)', background: 'var(--warning-bg)', padding: '6px 10px', borderRadius: 'var(--radius)' }}>
+            💡 힌트{hints.length > 1 ? ` ${i + 1}` : ''}: {h}
           </p>
-        )}
+        ))}
       </div>
 
       {/* 3D 장면 비교 */}

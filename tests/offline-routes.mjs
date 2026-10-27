@@ -496,6 +496,30 @@ check('#23 429 retry-after: 2 → 약 2초 뒤 재시도', r.status === 200 && D
   check('3W-C2 빈 본문 for(…); 에 가드', runGuarded('for (let i=0; i>=0; i++) ;') === 'GUARD')
   check('3W-C2 템플릿 ${} 안 반복문에 가드', runGuarded('const x = `${(() => { for (let i=0;i>=0;i++){} })()}`;') === 'GUARD')
   check('3W-C2 정상 반복은 그대로 끝남', runGuarded('for (let i = 0; i < 5; i++) sphere(); for (let j = 0; j < 3; j++) { sphere() }') === 'ended')
+  // MX2 실제 iframe 가드(buildGlowScriptHTML 블록 1): 횟수 한계로 무한 루프를 수 초 안에 끊고, 목표 장면은 한계의 10% 이하
+  {
+    const prevWindow = globalThis.window
+    globalThis.window = { location: { origin: 'http://x' } }
+    const html = gs.buildGlowScriptHTML('sphere()')
+    globalThis.window = prevWindow
+    const guardSrc = html.slice(html.indexOf('window.__gsLoopDeadline = 0;'), html.indexOf('// 중괄호 없는 for…of'))
+    const win = {}
+    new Function('window', guardSrc)(win)
+    const runReal = (code) => {
+      win.__gsLoopCount = 0
+      win.__gsLoopDeadline = Date.now() + gs.LOOP_BUDGET_MS
+      const t0 = Date.now()
+      let res = 'ended'
+      try { new Function('__gsLoopGuard', 'sphere', gs.instrumentLoops(code))(win.__gsLoopGuard, () => {}) } catch (e) { res = e.__gsLoop ? 'LOOP' : e.message }
+      win.__gsLoopDeadline = 0
+      return { res, ms: Date.now() - t0, count: win.__gsLoopCount }
+    }
+    const inf = runReal('while (true) {}')
+    check('MX2 실제 가드: while(true)를 횟수 한계로 3초 안에 끊음', inf.res === 'LOOP' && inf.ms < 3000 && inf.count === gs.LOOP_MAX_ITERATIONS + 1, S(inf))
+    check('MX2 실제 가드: 상한 = 가드 호출 500만 회 · 벽시계 15초', gs.LOOP_MAX_ITERATIONS === 5000000 && gs.LOOP_BUDGET_MS === 15000)
+    const big = runReal('for (let i = 0; i < 100000; i++) { sphere() }')
+    check('MX2 실제 가드: 반복 10만 회 정상 코드는 끝까지 실행', big.res === 'ended' && big.count === 100000, S(big))
+  }
   check('3W-C2 뼈대: 템플릿 ${} 안 while(true) 감지', gs.checkCodeSafety('const s = `${(() => { while (true) {} })()}`').ok === false)
   check('3W-C2 뼈대: 문자열 속 for(;;)는 무시', gs.checkCodeSafety('const s = "for (;;) {}"; label({text: `x=${1}`})').ok === true)
   // 2라운드 보강 — 조건식 판정·for…of·Function 별칭·정규식 보존

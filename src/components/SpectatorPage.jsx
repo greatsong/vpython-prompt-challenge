@@ -145,6 +145,8 @@ export default function SpectatorPage() {
     })
 
     socket.on('dashboard:update', loadTeams)
+    // 새 팀 등록(또는 기존 팀에 학생 추가) — 'N팀 참여 중'을 바로 갱신한다
+    socket.on('team:registered', loadTeams)
 
     socket.on('result:revealed', ({ rankings: r }) => {
       setRankings(r)

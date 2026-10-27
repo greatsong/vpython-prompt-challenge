@@ -93,10 +93,14 @@ export default function SessionController({ sessionId, onFinalEnd, onAuthExpired
     socket.on('connect', rejoin)
 
     // 진행 중 챌린지 복구 — 새로고침·재접속 시 서버가 현재 라운드를 되돌려준다
-    socket.on('challenge:started', ({ challengeId, timeLimit, resumed, challenge } = {}) => {
+    socket.on('challenge:started', ({ challengeId, timeLimit, resumed, challenge, hints } = {}) => {
       if (!resumed) return
       const c = BATTLE_CHALLENGES.find(ch => ch.id === challengeId)
       if (!c) return
+      // 이 라운드에 힌트를 이미 보냈으면 새로고침 뒤에도 '힌트 전송됨'으로 둔다 (같은 힌트를 두 번 보내지 않도록)
+      const hintAlreadySent = !!c.hint && Array.isArray(hints) && hints.includes(c.hint)
+      if (hintAlreadySent) setHintSent(true)
+      else if (selectedIdRef.current !== c.id) setHintSent(false)
       setSelectedId(c.id)
       selectedIdRef.current = c.id
       // 같은 챌린지면 다시 넣지 않는다 (대시보드의 목표 장면이 다시 로드되지 않도록)

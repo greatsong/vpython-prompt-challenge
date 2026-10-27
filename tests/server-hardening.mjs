@@ -475,11 +475,71 @@ try {
     check('연수 입장: 같은 IP 오타 10회 뒤에도 정확한 코드는 200', okAfter.status === 200, S(okAfter))
   }
 
+  // ── 브라우저 전수 검사 후속 (MX3·MX5) ─────────────────────────────────────
+  {
+    const tx = (await http('/api/auth/training', { method: 'POST', body: { code: TRAINING } })).data.token
+    const sx = (await http('/api/session/create', { method: 'POST', token: tx, body: { teacherCode: 'mx-x' } })).data.sessionId
+    const tmX = (await http('/api/session/register', { method: 'POST', body: { teacherCode: 'mx-x', students: [{ studentNumber: 'M01', studentName: '엠' }] } })).data
+    const tx1 = await connect()
+    await emitAck(tx1, 'auth:teacher', { token: tx })
+    await emitAck(tx1, 'teacher:join', { sessionId: sx })
+
+    // MX3 끊긴 사이에 보낸 힌트 → 재접속한 팀의 리플레이(resumed)에 hints 배열로 담긴다
+    await emitAck(tx1, 'challenge:start', { sessionId: sx, challengeId: 'battle-03', timeLimit: 0 })
+    const h1 = await emitAck(tx1, 'challenge:hint', { sessionId: sx, hint: '첫째 힌트' })
+    await emitAck(tx1, 'challenge:hint', { sessionId: sx, hint: '둘째 힌트' })
+    await emitAck(tx1, 'challenge:hint', { sessionId: sx, hint: '첫째 힌트' }) // 같은 힌트를 다시 보내도 한 번만
+    const ts3 = await connect()
+    const startedP = waitEvent(ts3, 'challenge:started', 1000)
+    const j3 = await emitAck(ts3, 'team:join', { teamId: tmX.teamId, teamToken: tmX.teamToken })
+    const rp3 = await startedP
+    check('MX3 재접속 리플레이에 이 라운드 힌트 배열(보낸 순서·중복 제거)',
+      h1?.ok === true && j3?.ok === true && rp3?.resumed === true && S(rp3?.hints) === S(['첫째 힌트', '둘째 힌트']), S([h1, j3, rp3?.hints]))
+    // 새 라운드가 시작되면 앞 라운드 힌트는 다시 보내지 않는다
+    await emitAck(tx1, 'challenge:start', { sessionId: sx, challengeId: 'battle-03', timeLimit: 0 })
+    const ts4 = await connect()
+    const startedP4 = waitEvent(ts4, 'challenge:started', 1000)
+    await emitAck(ts4, 'team:join', { teamId: tmX.teamId, teamToken: tmX.teamToken })
+    const rp4 = await startedP4
+    check('MX3 새 라운드 리플레이에는 이전 라운드 힌트 없음', rp4?.resumed === true && Array.isArray(rp4.hints) && rp4.hints.length === 0, S(rp4?.hints))
+    // 교사 화면 리플레이에도 hints가 담긴다 (SessionController가 '힌트 전송됨'을 복원)
+    await emitAck(tx1, 'challenge:hint', { sessionId: sx, hint: '셋째 힌트' })
+    const tx2 = await connect()
+    await emitAck(tx2, 'auth:teacher', { token: tx })
+    const tStartedP = waitEvent(tx2, 'challenge:started', 1000)
+    await emitAck(tx2, 'teacher:join', { sessionId: sx })
+    const trp = await tStartedP
+    check('MX3 교사 재입장 리플레이에도 hints', trp?.resumed === true && S(trp?.hints) === S(['셋째 힌트']), S(trp?.hints))
+    await emitAck(tx1, 'challenge:end', { sessionId: sx })
+
+    // MX5 팀 등록 → 수업 방(관람 화면 포함)에 team:registered, 실명은 싣지 않는다
+    const specX = await connect()
+    await emitAck(specX, 'team:join', { sessionId: sx, teamId: 'spectator' })
+    const regP = waitEvent(specX, 'team:registered', 1500)
+    const nameLeakP = waitEvent(specX, 'student:registered', 800)
+    const reg = await http('/api/session/register', { method: 'POST', body: { teacherCode: 'mx-x', students: [{ studentNumber: 'M02', studentName: '관람확인' }] } })
+    const regEv = await regP
+    check('MX5 등록 시 관람 소켓이 team:registered 수신', reg.status === 200 && !!regEv, S([reg.status, regEv]))
+    check('MX5 team:registered에 학생 실명 없음 · 관람 소켓은 student:registered 미수신',
+      !!regEv && !JSON.stringify(regEv).includes('관람확인') && (await nameLeakP) === null, S(regEv))
+    const pubDash = await http(`/api/public/dashboard/${sx}`)
+    check('MX5 공개 현황 팀 수 갱신(2팀)', pubDash.status === 200 && (pubDash.data.teams || []).length === 2, S(pubDash.data))
+  }
+
   // ── 최종 종료 후 팀 소켓 재입장 거부 ────────────────────────────────────────
   res = await emitAck(teacher, 'session:final-end', { sessionId })
   const lateTeam = await connect()
   const lateAck = await emitAck(lateTeam, 'team:join', { teamId: t1.data.teamId, teamToken: t1.data.teamToken })
   check('수업 종료 후 team:join 거부', res?.ok === true && lateAck?.ok === false, S([res, lateAck]))
+  // MX4 종료된 수업의 유효한 팀 토큰 → 401이 아니라 ended 안내 (팀 정보는 주지 않는다)
+  const endedTeam = await http(`/api/team/${t1.data.teamId}`, { teamToken: t1.data.teamToken })
+  check('MX4 종료 수업 + 유효 팀 토큰 → 200 { ended: true }, 팀 정보 없음',
+    endedTeam.status === 200 && endedTeam.data?.ended === true && !('name' in (endedTeam.data || {})) && !('members' in (endedTeam.data || {})), S(endedTeam))
+  const endedWrong = await http(`/api/team/${t1.data.teamId}`, { teamToken: t2.data.teamToken })
+  check('MX4 종료 수업 + 다른 팀 토큰 → 여전히 401', endedWrong.status === 401, S(endedWrong))
+  check('MX4 종료 수업 소켓 재입장: ack sessionEnded', lateAck?.sessionEnded === true, S(lateAck))
+  const endedGen = await http('/api/generate', { method: 'POST', teamToken: t1.data.teamToken, body: { teamId: t1.data.teamId, prompt: 'x', challengeId: 'battle-01' } })
+  check('MX4 종료 수업 팀 토큰으로 생성 API는 계속 401', endedGen.status === 401, S(endedGen))
 
   await wait(200)
   check('최종: 프로세스 생존 + 처리되지 않은 예외 없음', exited === null && !getLog().includes('[Process] 처리되지 않은'), S(exited))

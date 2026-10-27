@@ -40,6 +40,26 @@ export function findTeamByToken(db, teamId, token) {
   return team
 }
 
+/**
+ * 토큰은 그 팀의 것이 맞는데 수업이 이미 끝났는지.
+ * 종료된 수업의 팀 화면을 새로고침했을 때 '인증 만료'(401)가 아니라 '수업 종료'로 안내하는 데 쓴다.
+ * 이 값이 true여도 팀 권한은 주지 않는다(제출·조회는 findTeamByToken이 계속 막는다).
+ */
+export function isTeamTokenOfEndedSession(db, teamId, token) {
+  if (!teamId || !token || typeof token !== 'string') return false
+  if (typeof teamId !== 'string' && typeof teamId !== 'number') return false
+  const team = db
+    .prepare(`
+      SELECT t.access_token, s.status AS session_status
+      FROM teams t
+      JOIN sessions s ON s.id = t.session_id
+      WHERE t.id = ?
+    `)
+    .get(teamId)
+  if (!team || team.session_status !== 'ended') return false
+  return safeEqual(token, team.access_token)
+}
+
 export function getAuthorizedTeam(req, teamId = req.body?.teamId || req.query?.teamId) {
   return findTeamByToken(req.db, teamId, getTeamToken(req))
 }
