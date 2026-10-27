@@ -15,13 +15,13 @@ export default function WaitingScreen({ team }) {
         borderRadius: '50%',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         fontSize: '2rem',
-        boxShadow: `0 0 30px ${team.color}66`,
+        boxShadow: `0 8px 30px ${team.color}55`,
         animation: 'pulse 2s ease-in-out infinite',
       }}>
         ⏳
       </div>
 
-      <h2 style={{ fontSize: '1.5rem', fontWeight: 700 }}>준비 완료!</h2>
+      <h2 style={{ fontSize: '1.5rem', fontWeight: 800 }}>준비 완료!</h2>
       <p style={{ color: 'var(--text-muted)', textAlign: 'center' }}>
         선생님이 수업을 시작하면 자동으로 화면이 전환됩니다.
       </p>
@@ -30,8 +30,9 @@ export default function WaitingScreen({ team }) {
         marginTop: '16px',
         padding: '16px 24px',
         background: 'var(--surface)',
-        border: `1px solid ${team.color}`,
+        border: `1.5px solid ${team.color}`,
         borderRadius: 'var(--radius-lg)',
+        boxShadow: 'var(--shadow-md)',
         textAlign: 'center',
       }}>
         <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', marginBottom: '4px' }}>우리 팀</p>

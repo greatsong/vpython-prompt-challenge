@@ -40,9 +40,10 @@ function teacherSocket(token, sessionId) {
   return sock
 }
 
-function teamSocket(sessionId, teamId) {
+// team:join은 팀 토큰(teamToken)이 있어야 방에 들어간다 (등록 응답의 teamToken)
+function teamSocket(sessionId, teamId, teamToken) {
   const sock = io(BASE, { path: '/socket.io', transports: ['websocket'], forceNew: true })
-  sock.on('connect', () => sock.emit('team:join', { sessionId, teamId }))
+  sock.on('connect', () => sock.emit('team:join', { sessionId, teamId, teamToken }))
   return sock
 }
 
@@ -99,8 +100,8 @@ async function smokeTest() {
 
   // 소켓 통신: 교사 + 팀 소켓
   const teacherSock = teacherSocket(token, sessionId)
-  const team1Sock = teamSocket(sessionId, t1new.teamId)
-  const team2Sock = teamSocket(sessionId, t2.teamId)
+  const team1Sock = teamSocket(sessionId, t1new.teamId, t1new.teamToken)
+  const team2Sock = teamSocket(sessionId, t2.teamId, t2.teamToken)
 
   await wait(300)
 
@@ -256,7 +257,7 @@ async function reconnectTest() {
   teacherSock.on('connect', doAuthAndJoin)
 
   // 팀 소켓
-  const teamSock = teamSocket(sessionId, teamId)
+  const teamSock = teamSocket(sessionId, teamId, team.teamToken)
   await wait(400)
 
   // 첫 번째 브로드캐스트 — 교사에게 직접 가지 않지만, 팀이 이벤트를 받을 수 있는지 먼저 확인

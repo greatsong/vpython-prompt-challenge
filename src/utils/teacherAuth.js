@@ -7,6 +7,8 @@
  */
 
 const TOKEN_KEY = 'vpython_teacher_token'
+// 토큰 범위 — 'admin'(운영 PIN) | 'training'(연수 입장 코드). 서버 /api/auth/verify 응답으로 갱신한다.
+const SCOPE_KEY = 'vpython_teacher_scope'
 
 export function setTeacherToken(token) {
   if (token) sessionStorage.setItem(TOKEN_KEY, token)
@@ -18,6 +20,15 @@ export function getTeacherToken() {
 
 export function clearTeacherToken() {
   sessionStorage.removeItem(TOKEN_KEY)
+  sessionStorage.removeItem(SCOPE_KEY)
+}
+
+export function setTeacherScope(scope) {
+  if (scope) sessionStorage.setItem(SCOPE_KEY, scope)
+}
+
+export function getTeacherScope() {
+  return sessionStorage.getItem(SCOPE_KEY) || null
 }
 
 /** 교사 전용 fetch — x-teacher-token 헤더 자동 주입 */

@@ -89,7 +89,7 @@ const PART_GROUPS = [
   ['모자'],
   ['층', '단'],
   ['칸', '격자'],
-  ['불', '등', '램프'],
+  ['불', '전등', '등불', '램프'],
   ['추', '무게추'],
   ['날개'],
   ['계단'],
@@ -109,10 +109,47 @@ export function normalizePrompt(text) {
   return String(text || '').trim().replace(/\s+/g, ' ')
 }
 
+// ── 한 글자 이름 판정 ───────────────────────────────────────────────────────
+// '구'·'눈'·'코'·'입'·'단'·'불'·'추' 같은 한 글자 이름을 includes로 세면 '구조'·'입체'·'단계'·
+// '추가' 같은 다른 낱말에서도 잡힌다. 한 글자 이름은 앞이 문장 처음·공백·숫자·문장 부호이고
+// 뒤가 끝·공백·문장 부호·조사일 때만 인정한다.
+// 조사처럼 보이는 글자로 이어지는 다른 낱말('구도', '추가로', '불만' 등)은 먼저 지운다.
+const LONG_WORD_EXCLUDES = [
+  '구조', '구성', '구도', '구분', '구간', '입체', '입력', '배열', '단계', '단위', '단면', '단순',
+  '추가로', '추가해', '추가하', '추가된', '추가적', '불만', '판도', '코로나', '공간', '공중',
+]
+const PARTICLE_AFTER =
+  '(?:으로|처럼|보다|까지|부터|마다|끼리|하고|이랑|입니다|가|이|를|을|은|는|와|과|의|에|로|도|만|들|랑)'
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+const singleCharPatterns = new Map()
+function singleCharPattern(word) {
+  if (!singleCharPatterns.has(word)) {
+    singleCharPatterns.set(
+      word,
+      new RegExp(`(?:^|[^가-힣])${escapeRegExp(word)}(?=$|[^가-힣]|${PARTICLE_AFTER})`),
+    )
+  }
+  return singleCharPatterns.get(word)
+}
+
+function stripLongWords(text) {
+  let result = text
+  for (const word of LONG_WORD_EXCLUDES) result = result.split(word).join(' ')
+  return result
+}
+
 function countGroups(text, groups) {
+  const stripped = stripLongWords(text)
   let hit = 0
   for (const group of groups) {
-    if (group.some((word) => text.includes(word))) hit += 1
+    const found = group.some((word) =>
+      word.length === 1 ? singleCharPattern(word).test(stripped) : text.includes(word),
+    )
+    if (found) hit += 1
   }
   return hit
 }
@@ -128,9 +165,11 @@ export function scoreCT(prompt, maxPoints = CT_MAX_POINTS) {
   const compact = text.replace(/\s/g, '')
 
   // A. 완결된 문장
-  const fragments = text
+  // 원문에서 먼저 문장을 나눈 뒤 각 문장의 공백을 정규화한다.
+  // (정규화를 먼저 하면 줄바꿈이 공백이 되어 줄마다 쓴 문장이 한 문장으로 합쳐진다)
+  const fragments = String(prompt || '')
     .split(/[.!?。\n]+/)
-    .map((s) => s.trim())
+    .map((s) => normalizePrompt(s))
     .filter((s) => s.length >= 6)
   const completeSentences = fragments.filter((s) => SENTENCE_END_RE.test(s)).length
   const sentenceScore = completeSentences >= 2 ? 3 : completeSentences === 1 ? 2 : 0

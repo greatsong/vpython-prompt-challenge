@@ -1,6 +1,7 @@
 import { Router } from 'express'
 // 정답 코드가 포함된 서버 전용 챌린지 데이터 (클라이언트 번들에는 메타데이터만 들어간다)
 import { BATTLE_CHALLENGES } from '../server-data/challenges.js'
+import { requireTeam } from './teamAuth.js'
 
 const router = Router()
 
@@ -49,11 +50,22 @@ router.get('/:id', (req, res) => {
 })
 
 // POST /api/challenges — 학생 출제 문제 등록 (Session 4)
-router.post('/', (req, res) => {
-  const { teamId, title, description, code, hint, ct_elements, difficulty } = req.body
+// 팀 토큰(x-team-token 헤더 또는 body.teamToken)이 있어야 하고, 자기 팀(body.teamId)으로만 등록한다.
+const TEXT_LIMITS = { title: 100, description: 2000, code: 20000, hint: 500 }
 
-  if (!teamId || !title || !code)
-    return res.status(400).json({ error: 'teamId, title, code 필요' })
+router.post('/', requireTeam, (req, res) => {
+  const { title, description, code, hint, ct_elements, difficulty } = req.body || {}
+
+  if (typeof title !== 'string' || !title.trim() || typeof code !== 'string' || !code.trim())
+    return res.status(400).json({ error: 'title, code 필요' })
+  for (const [key, max] of Object.entries(TEXT_LIMITS)) {
+    const value = req.body[key]
+    if (value !== undefined && value !== null && (typeof value !== 'string' || value.length > max)) {
+      return res.status(400).json({ error: `${key}는 ${max}자 이하 글자여야 합니다` })
+    }
+  }
+  const elements = Array.isArray(ct_elements) ? ct_elements.filter((e) => typeof e === 'string').slice(0, 10) : []
+  const level = ['기본', '중급', '도전'].includes(difficulty) ? difficulty : '기본'
 
   const result = req.db
     .prepare(
@@ -62,16 +74,16 @@ router.post('/', (req, res) => {
        VALUES (?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
-      teamId,
-      title,
+      req.team.id,
+      title.trim(),
       description || '',
       code,
       hint || '',
-      JSON.stringify(ct_elements || []),
-      difficulty || '기본'
+      JSON.stringify(elements),
+      level
     )
 
-  res.json({ id: result.lastInsertRowid, title })
+  res.json({ id: result.lastInsertRowid, title: title.trim() })
 })
 
 export default router

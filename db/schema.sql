@@ -6,7 +6,8 @@ CREATE TABLE IF NOT EXISTS sessions (
   mode       TEXT DEFAULT 'battle',  -- battle|detective|surgery|creator|compare
   status     TEXT DEFAULT 'waiting', -- waiting|active|paused|ended
   session_number INTEGER DEFAULT 1,  -- 1~5 (어느 세션인지)
-  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  owner_token_hash TEXT               -- 만든 교사 토큰의 해시 (연수 토큰의 자기 수업 확인용)
 );
 
 -- 팀
@@ -55,10 +56,13 @@ CREATE TABLE IF NOT EXISTS attempts (
   ct_scores       TEXT DEFAULT '{}',   -- JSON: {decomp, pattern, abstract, algorithm}
   evaluation      TEXT DEFAULT '{}',   -- JSON: 전체 평가 결과
   created_at      DATETIME DEFAULT CURRENT_TIMESTAMP,
+  proof_jti       TEXT,                -- 평가 증명 id (같은 증명 재사용 방지, 유니크 인덱스는 migrate.js)
+  created_ms      INTEGER,             -- 저장 시각(ms). created_at은 초 단위라 같은 초의 라운드 경계를 가르지 못한다
   FOREIGN KEY (team_id) REFERENCES teams(id)
 );
 
 -- 교사 인증 토큰 (서버 재시작 후에도 로그인 유지)
+-- scope·issued_at 컬럼은 teacherAuth.js의 initTeacherAuth가 보강한다
 CREATE TABLE IF NOT EXISTS teacher_tokens (
   token      TEXT PRIMARY KEY,
   expires_at INTEGER NOT NULL
@@ -90,11 +94,13 @@ CREATE TABLE IF NOT EXISTS evaluation_cache (
   created_at      INTEGER NOT NULL
 );
 
--- 진행 중인 챌린지 상태 (서버 재시작 후 복구용)
+-- 세션별 최근 챌린지 상태 (서버 재시작 후 복구 + 마감 판정용)
 -- 서버가 죽어도 이 레코드로 activeChallenge 맵과 자동 종료 타이머를 되살린다.
+-- ended_at IS NULL 이면 진행 중, 값이 있으면 그 시각에 마감됐다(마감 직후 유예 제출 판정에 쓴다).
 CREATE TABLE IF NOT EXISTS active_challenges (
   session_id   TEXT PRIMARY KEY,
   challenge_id TEXT,
   time_limit   INTEGER,
-  started_at   INTEGER
+  started_at   INTEGER,
+  ended_at     INTEGER
 );

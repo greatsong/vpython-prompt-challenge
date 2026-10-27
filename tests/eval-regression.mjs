@@ -7,6 +7,11 @@
  *   npm run test:evaluation
  *   node tests/eval-regression.mjs --live --teacher-pin=123456 --repeat=3 --limit=6
  *   node tests/eval-regression.mjs --live --teacher-token=... --repeat=3 --challenge=battle-04
+ *   node tests/eval-regression.mjs --live --teacher-pin=123456 --repeat=3 --limit=6 --no-cache
+ *
+ * --no-cache sends `x-eval-nocache: 1`. With a teacher token the server then skips
+ * the evaluation cache (no read, no write), so repeated runs measure the real
+ * score spread (std) instead of replaying the first cached score.
  *
  * Use --all in live mode to run every rubric anchor. Without --all or --limit,
  * live mode intentionally samples the first 6 cases to avoid surprise API cost.
@@ -55,6 +60,7 @@ async function runLimited(tasks, concurrency) {
 }
 
 const live = hasFlag('live')
+const noCache = hasFlag('no-cache')
 const all = hasFlag('all')
 const base = getArg('base', process.env.EVAL_TEST_BASE || 'http://localhost:4009')
 const repeat = Math.max(1, numberArg('repeat', 1))
@@ -121,6 +127,7 @@ if (selectedCases.length === 0) {
 
 console.log(`live base=${base} repeat=${repeat} concurrency=${concurrency} selected=${selectedCases.length}`)
 console.log(`thresholds tolerance=±${tolerance} maxStd=${maxStd}`)
+console.log(`cache=${noCache ? 'bypass (x-eval-nocache: 1)' : 'on (repeats after the first may be cache hits)'}`)
 
 if (!teacherToken && teacherPin) {
   const auth = await fetch(`${base}/api/auth/teacher`, {
@@ -144,7 +151,11 @@ if (!teacherToken) {
 async function evaluate(testCase) {
   const res = await fetch(`${base}/api/evaluate`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-teacher-token': teacherToken },
+    headers: {
+      'Content-Type': 'application/json',
+      'x-teacher-token': teacherToken,
+      ...(noCache ? { 'x-eval-nocache': '1' } : {}),
+    },
     body: JSON.stringify({
       prompt: testCase.prompt,
       generatedCode: '',
@@ -158,15 +169,17 @@ async function evaluate(testCase) {
   if (!res.ok) throw new Error(`${res.status} ${text.slice(0, 180)}`)
 
   const data = JSON.parse(text)
+  if (data.failed) throw new Error(`evaluation failed: ${data.feedback || ''}`)
   return {
     score: Number(data.score),
     feedback: data.feedback || '',
+    cached: data.cached === true,
   }
 }
 
 const results = new Map(selectedCases.map((testCase) => [
   testCase.id,
-  { testCase, scores: [], errors: [] },
+  { testCase, scores: [], errors: [], cachedHits: 0 },
 ]))
 
 const tasks = []
@@ -177,6 +190,7 @@ for (const testCase of selectedCases) {
       try {
         const data = await evaluate(testCase)
         bucket.scores.push(data.score)
+        if (data.cached) bucket.cachedHits += 1
       } catch (err) {
         bucket.errors.push(err.message)
       }
@@ -187,7 +201,7 @@ for (const testCase of selectedCases) {
 await runLimited(tasks, concurrency)
 
 let failed = 0
-for (const { testCase, scores, errors } of results.values()) {
+for (const { testCase, scores, errors, cachedHits } of results.values()) {
   if (errors.length > 0 || scores.length === 0) {
     failed += 1
     console.log(`FAIL ${testCase.id} expected=${testCase.expected} errors=${errors.join(' | ')}`)
@@ -202,7 +216,8 @@ for (const { testCase, scores, errors } of results.values()) {
 
   console.log(
     `${ok ? 'PASS' : 'FAIL'} ${testCase.id} expected=${testCase.expected} ` +
-    `scores=[${scores.join(',')}] avg=${avg.toFixed(1)} delta=${delta.toFixed(1)} std=${spread.toFixed(1)}`
+    `scores=[${scores.join(',')}] avg=${avg.toFixed(1)} delta=${delta.toFixed(1)} std=${spread.toFixed(1)} ` +
+    `cached=${cachedHits}/${scores.length}`
   )
 }
 

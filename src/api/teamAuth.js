@@ -18,11 +18,15 @@ export function sanitizeTeam(team) {
   return safeTeam
 }
 
-export function getAuthorizedTeam(req, teamId = req.body?.teamId || req.query?.teamId) {
-  const token = getTeamToken(req)
-  if (!teamId || !token) return null
+/**
+ * 팀 id + 팀 토큰으로 팀을 찾는다. 토큰이 맞지 않거나 수업이 끝났으면 null.
+ * HTTP(getAuthorizedTeam)와 소켓(team:join)이 함께 쓴다.
+ */
+export function findTeamByToken(db, teamId, token) {
+  if (!teamId || !token || typeof token !== 'string') return null
+  if (typeof teamId !== 'string' && typeof teamId !== 'number') return null
 
-  const team = req.db
+  const team = db
     .prepare(`
       SELECT t.*, s.status AS session_status
       FROM teams t
@@ -34,6 +38,10 @@ export function getAuthorizedTeam(req, teamId = req.body?.teamId || req.query?.t
   if (!team || team.session_status === 'ended') return null
   if (!safeEqual(token, team.access_token)) return null
   return team
+}
+
+export function getAuthorizedTeam(req, teamId = req.body?.teamId || req.query?.teamId) {
+  return findTeamByToken(req.db, teamId, getTeamToken(req))
 }
 
 export function requireTeam(req, res, next) {

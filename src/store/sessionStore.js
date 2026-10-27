@@ -9,8 +9,12 @@ const useSessionStore = create((set) => ({
   sessionId: null,
   currentChallenge: null,
   submissionProgress: EMPTY_PROGRESS,
+  // 교사 화면의 현재 챌린지 진행 상태 — 'idle' | 'running' | 'ended'
+  // SessionController가 쓰고, 형제인 ClassDashboard가 "결과 공개" 버튼 노출에 쓴다.
+  challengeStatus: 'idle',
 
   setSession: (data) => set(data),
+  setChallengeStatus: (status) => set({ challengeStatus: status }),
   // 챌린지가 바뀌면 이전 라운드의 집계가 남지 않도록 함께 초기화한다
   setChallenge: (challenge) => set({ currentChallenge: challenge, submissionProgress: EMPTY_PROGRESS }),
   setSubmissionProgress: (progress) => set({ submissionProgress: progress }),

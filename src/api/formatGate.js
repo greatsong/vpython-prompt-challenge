@@ -6,7 +6,8 @@
  * "인상적입니다", "탁월"이라고 칭찬까지 해서 어뷰징을 강화하고 있었다.
  *
  * 이 모듈은 "장면을 관찰해 언어화한 묘사"가 아닌 제출물을 결정적 규칙으로 걸러낸다.
- * 채점 프롬프트에도 같은 기준을 넣지만, 규칙 기반 판정이 우선한다(LLM 판정보다 재현성이 높다).
+ * 채점 프롬프트에도 같은 기준을 넣지만, 점수 제재는 이 규칙 판정으로만 한다(LLM 판정보다 재현성이 높다).
+ * 채점 AI가 형식 위반을 의심해도 제재하지 않고 개선 안내 한 줄만 붙인다(src/api/ai.js).
  *
  * 걸리면:
  *   - ct_score = 0
@@ -36,6 +37,12 @@ const KEY_VALUE_LINE_RE = /^[^\n:：=]{1,24}\s*[:：=]\s*\S.*$/
 
 // '~음/~임' 명사형 종결은 완결 문장으로 치지 않는다 (src/api/ctScore.js와 동일한 기준)
 const SENTENCE_END_RE = /(다|요|까|죠|네|군|야|해)$/
+
+/** 요소명 대조에 쓸 만한 이름인가 — 짧은 이름과 색 이름은 일상 묘사와 겹친다 */
+function isListableName(name) {
+  const value = String(name || '').trim()
+  return value.length >= 4 && !value.endsWith('색')
+}
 
 export const FORMAT_GATE_NOTICE =
   '항목을 나열한 것은 묘사가 아닙니다. 본 것을 문장으로 설명해 주세요.'
@@ -68,11 +75,19 @@ export function detectFormatViolation(prompt, rubric = null) {
     return { violated: true, reason: 'axis-names', matched: axisHits }
   }
 
+  // 완결 문장 수 — (a-2)의 적용 여부와 (c)에 함께 쓴다
+  const completeSentences = text
+    .split(/[.!?。\n]+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length >= 6 && SENTENCE_END_RE.test(s)).length
+
   // (a-2) 루브릭 요소명을 그대로 옮겨 적음
-  if (rubric?.elements?.length) {
+  // 완결 문장이 2개 이상이면 요소명이 겹쳐도 묘사로 본다(정상 묘사가 걸린 실측 사례가 있다).
+  // 셀 때도 짧은 이름(4자 미만)과 '~색'으로 끝나는 이름은 빼서 일상어와 겹치지 않게 한다.
+  if (rubric?.elements?.length && completeSentences < 2) {
     const nameHits = rubric.elements
       .map((element) => element.name)
-      .filter((name) => name.length >= 3 && text.includes(name))
+      .filter((name) => isListableName(name) && text.includes(name))
     if (nameHits.length >= 3) {
       return { violated: true, reason: 'rubric-names', matched: nameHits }
     }
@@ -89,10 +104,6 @@ export function detectFormatViolation(prompt, rubric = null) {
     .map((line) => line.trim())
     .filter(Boolean)
   const keyValueLines = lines.filter((line) => KEY_VALUE_LINE_RE.test(line)).length
-  const completeSentences = text
-    .split(/[.!?。\n]+/)
-    .map((s) => s.trim())
-    .filter((s) => s.length >= 6 && SENTENCE_END_RE.test(s)).length
 
   if (keyValueLines >= 3 && completeSentences === 0) {
     return { violated: true, reason: 'key-value-list', matched: [`키-값 ${keyValueLines}줄`] }

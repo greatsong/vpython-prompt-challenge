@@ -1,6 +1,6 @@
 # VPython 프롬프트 챌린지 — 개발 기록
 
-> 최종 업데이트: 2026-03-19
+> 최종 업데이트: 2026-10-27
 
 ## 프로젝트 개요
 
@@ -12,8 +12,8 @@
 
 ```
 학생이 3D 장면을 보고 → 자연어 프롬프트 작성 →
-Claude Haiku가 VPython 코드 생성 → GlowScript 3D 렌더링 →
-Claude Sonnet이 원본 대비 평가 (100점 만점 + CT 점수)
+Claude Sonnet 5.5가 VPython 코드 생성 → GlowScript 3D 렌더링 →
+Claude Sonnet 5.5가 원본 대비 평가 (100점 만점 + CT 점수)
 ```
 
 ### 기술 스택
@@ -23,7 +23,7 @@ Claude Sonnet이 원본 대비 평가 (100점 만점 + CT 점수)
 | 프론트엔드 | React 18 + Vite + Zustand |
 | 백엔드 | Express + Socket.io |
 | 데이터베이스 | SQLite (better-sqlite3, WAL 모드) |
-| AI | Anthropic Claude API (Haiku: 코드 생성, Sonnet: 평가) |
+| AI | Anthropic Claude API (생성·채점·분석 모두 `claude-sonnet-5-5`, 모델 ID는 `src/api/ai.js` 상단 상수 `MODEL_GENERATE`·`MODEL_EVALUATE`·`MODEL_ANALYZE`) |
 | 3D 렌더링 | GlowScript/VPython 3.2 (Blob URL iframe) |
 | 배포 | Fly.io (도쿄 리전, 영구 볼륨) |
 
@@ -155,6 +155,21 @@ Claude Sonnet이 원본 대비 평가 (100점 만점 + CT 점수)
 - **해결**:
   1. 마운트 시 세션 상태 확인 — 종료된 세션이면 `/join`으로 리디렉트
   2. `session:ended` 소켓 이벤트 수신 시 세션 종료 화면 표시
+
+### 11. 2026-10-27 Sonnet 5.5 전환
+- **파일**: `src/api/ai.js`, `src/api/evaluationCache.js`, `server.js`, `tests/eval-regression.mjs`
+- **배경**: 생성·채점·분석 모두 `claude-sonnet-4-6`이었다. 원래 설계(생성 Haiku, 채점 Sonnet)는 구현되지 않았다.
+- **변경**:
+  1. 모델 ID를 `ai.js` 상단 상수로 모았다. 다음 전환은 상수 한 줄만 고친다.
+  2. `temperature`를 모든 요청에서 뺐다. Sonnet 5.5는 기본값이 아닌 temperature·top_p·top_k를 400으로 거부한다. 같은 답의 같은 점수는 채점 캐시가 보장한다.
+  3. effort를 지정했다. 생성·분석은 `low`, 채점은 `medium`이다. 생성은 `thinking: { type: 'between_tools' }`로 생각을 끈다(Sonnet 5.5에서 `disabled`는 400).
+  4. 응답은 `type === 'text'` 블록만 읽는다. 앞쪽에 thinking 블록이 올 수 있다.
+  5. `stop_reason`이 `refusal`이면 422와 안내 문구를, 채점·분석이 `max_tokens`에서 잘리면 502를 돌려준다. 생성 잘림은 기존 422 안내를 유지한다.
+  6. max_tokens를 채점 1500 → 4096, 분석 512 → 2048로 올렸다. 생각 토큰도 max_tokens에 포함된다. 생성은 8192 그대로다.
+  7. 코드 펜스 벗기기를 보강했다. 태그가 없거나 다른 태그여도, 펜스 앞에 설명 문장이 있어도 첫 펜스 안쪽을 코드로 잡는다.
+  8. `EVAL_CACHE_VERSION`을 `v3-2026-10-sonnet55`로 올리고 캐시 키에 채점 모델·effort 태그를 넣었다.
+  9. API 키 검증 호출을 `claude-haiku-5-5`(thinking 끔, max_tokens 10)로 바꿨다.
+  10. 교사 토큰과 `x-eval-nocache: 1` 헤더가 함께 오면 채점 캐시를 읽지도 쓰지도 않는다. `tests/eval-regression.mjs --no-cache`로 채점 편차를 측정한다.
 
 ---
 

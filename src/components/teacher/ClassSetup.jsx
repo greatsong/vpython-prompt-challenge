@@ -1,7 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { teacherFetch } from '../../utils/teacherAuth.js'
 
-export default function ClassSetup({ onSessionCreated, onAuthExpired }) {
+// trainingMode: 연수 입장 코드로 들어온 교사. API 키는 운영자가 설정한 값을 쓰고,
+// 이미 사용 중인 수업코드로는 수업을 만들 수 없다(서버가 409로 거절).
+// entryNotice: 저장된 수업에 접근할 수 없어 이 화면으로 돌아왔을 때 교사 화면이 넘겨 주는 안내
+export default function ClassSetup({ onSessionCreated, onAuthExpired, trainingMode = false, entryNotice = '' }) {
   const [teacherCode, setTeacherCode] = useState('')
   const [apiKey, setApiKey] = useState('')
   const [apiKeyStatus, setApiKeyStatus] = useState('unchecked') // unchecked | checking | valid | error
@@ -54,7 +57,11 @@ export default function ClassSetup({ onSessionCreated, onAuthExpired }) {
   // forceNew=true면 같은 수업 코드의 기존 세션을 종료하고 완전히 새로 시작한다.
   const handleStart = async ({ forceNew = false } = {}) => {
     if (!teacherCode.trim()) return setError('수업 코드를 입력해주세요')
-    if (apiKeyStatus !== 'valid') return setError('먼저 API 키를 설정해주세요')
+    if (apiKeyStatus !== 'valid') {
+      return setError(trainingMode
+        ? '운영자가 아직 API 키를 설정하지 않았습니다. 연수 진행자에게 알려 주세요'
+        : '먼저 API 키를 설정해주세요')
+    }
 
     if (forceNew) {
       const ok = window.confirm(
@@ -131,9 +138,34 @@ export default function ClassSetup({ onSessionCreated, onAuthExpired }) {
         background: 'var(--surface)',
         border: '1px solid var(--border)',
         borderRadius: 'var(--radius-lg)',
+        boxShadow: 'var(--shadow-md)',
         padding: '32px',
       }}>
-        <h1 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '8px' }}>
+        {/* 연수 입장으로 들어왔음을 수업 생성 단계부터 알린다 (수업 화면 헤더와 같은 배지) */}
+        {trainingMode && (
+          <span style={{
+            display: 'inline-block',
+            fontSize: '0.6875rem', fontWeight: 800, padding: '2px 10px', marginBottom: '10px',
+            borderRadius: 'var(--radius-pill)', background: '#FDD98A', color: 'var(--text)',
+          }}>
+            연수 모드
+          </span>
+        )}
+        {entryNotice && (
+          <div role="status" style={{
+            padding: '10px 12px',
+            marginBottom: '16px',
+            background: 'var(--warning-bg)',
+            border: '1px solid var(--gold)',
+            borderRadius: 'var(--radius)',
+            fontSize: '0.8125rem',
+            lineHeight: 1.5,
+            color: 'var(--text)',
+          }}>
+            {entryNotice}
+          </div>
+        )}
+        <h1 style={{ fontSize: 'clamp(1.15rem, 5.5vw, 1.5rem)', fontWeight: 800, marginBottom: '8px', wordBreak: 'keep-all' }}>
           VPython 프롬프트 챌린지
         </h1>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '28px' }}>
@@ -144,14 +176,27 @@ export default function ClassSetup({ onSessionCreated, onAuthExpired }) {
         <label style={labelStyle}>
           Claude API 키 {keyStatusIcon[apiKeyStatus]}
         </label>
-        {apiKeyConfigured && apiKeyStatus === 'valid' && !apiKey ? (
+        {trainingMode ? (
           <div style={{
             padding: '10px 12px',
-            background: 'var(--bg)',
-            border: '1px solid #22c55e',
+            background: apiKeyConfigured ? 'var(--success-bg)' : 'var(--card2)',
+            border: `1px solid ${apiKeyConfigured ? 'var(--success)' : 'var(--border)'}`,
             borderRadius: 'var(--radius)',
             fontSize: '0.875rem',
-            color: '#22c55e',
+            color: apiKeyConfigured ? 'var(--success-text)' : 'var(--text-muted)',
+          }}>
+            {apiKeyConfigured
+              ? '연수 모드에서는 운영자가 설정한 키를 사용합니다'
+              : '연수 모드에서는 운영자가 설정한 키를 사용합니다. 아직 키가 설정되지 않았습니다.'}
+          </div>
+        ) : apiKeyConfigured && apiKeyStatus === 'valid' && !apiKey ? (
+          <div style={{
+            padding: '10px 12px',
+            background: 'var(--success-bg)',
+            border: '1px solid var(--success)',
+            borderRadius: 'var(--radius)',
+            fontSize: '0.875rem',
+            color: 'var(--success-text)',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
@@ -181,12 +226,12 @@ export default function ClassSetup({ onSessionCreated, onAuthExpired }) {
               disabled={apiKeyStatus === 'checking'}
               style={{
                 padding: '10px 16px',
-                background: apiKeyStatus === 'checking' ? 'var(--surface2)' : 'var(--accent)',
-                color: 'white',
+                background: apiKeyStatus === 'checking' ? 'var(--surface2)' : 'var(--btn-primary-bg)',
+                color: apiKeyStatus === 'checking' ? 'var(--text-muted)' : 'var(--btn-primary-text)',
                 border: 'none',
-                borderRadius: 'var(--radius)',
+                borderRadius: 'var(--radius-btn)',
                 fontSize: '0.8125rem',
-                fontWeight: 600,
+                fontWeight: 800,
                 cursor: apiKeyStatus === 'checking' ? 'not-allowed' : 'pointer',
                 whiteSpace: 'nowrap',
               }}
@@ -195,9 +240,11 @@ export default function ClassSetup({ onSessionCreated, onAuthExpired }) {
             </button>
           </div>
         )}
-        <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-          Anthropic Claude API 키 (console.anthropic.com에서 발급)
-        </p>
+        {!trainingMode && (
+          <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+            Anthropic Claude API 키 (console.anthropic.com에서 발급)
+          </p>
+        )}
 
         {/* 구분선 */}
         <div style={{ borderTop: '1px solid var(--border)', margin: '20px 0' }} />
@@ -211,17 +258,19 @@ export default function ClassSetup({ onSessionCreated, onAuthExpired }) {
           style={inputStyle}
         />
         <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px' }}>
-          학생들이 이 코드를 입력해서 수업에 참여합니다
+          {trainingMode
+            ? '학생들이 이 코드를 입력해서 수업에 참여합니다. 다른 선생님과 겹치지 않는 코드로 정해 주세요'
+            : '학생들이 이 코드를 입력해서 수업에 참여합니다'}
         </p>
 
         {error && (
-          <p style={{ color: 'var(--danger)', fontSize: '0.875rem', marginTop: '12px' }}>
+          <p style={{ color: 'var(--danger-text)', fontSize: '0.875rem', marginTop: '12px' }}>
             {error}
           </p>
         )}
 
         {notice && (
-          <p style={{ color: 'var(--success)', fontSize: '0.875rem', marginTop: '12px' }}>
+          <p style={{ color: 'var(--success-text)', fontSize: '0.875rem', marginTop: '12px' }}>
             {notice}
           </p>
         )}
@@ -233,18 +282,25 @@ export default function ClassSetup({ onSessionCreated, onAuthExpired }) {
             marginTop: '24px',
             width: '100%',
             padding: '12px',
-            background: (loading || apiKeyStatus !== 'valid') ? 'var(--surface2)' : 'var(--accent)',
-            color: 'white',
+            background: (loading || apiKeyStatus !== 'valid') ? 'var(--surface2)' : 'var(--btn-primary-bg)',
+            color: (loading || apiKeyStatus !== 'valid') ? 'var(--text-muted)' : 'var(--btn-primary-text)',
             border: 'none',
-            borderRadius: 'var(--radius)',
+            borderRadius: 'var(--radius-btn)',
+            boxShadow: (loading || apiKeyStatus !== 'valid') ? 'none' : '0 6px 18px var(--shadow)',
             fontSize: '1rem',
-            fontWeight: 700,
+            fontWeight: 800,
             cursor: (loading || apiKeyStatus !== 'valid') ? 'not-allowed' : 'pointer',
           }}
         >
-          {loading ? '준비 중...' : apiKeyStatus !== 'valid' ? 'API 키를 먼저 설정하세요' : '수업 시작 (이어가기)'}
+          {loading
+            ? '준비 중...'
+            : apiKeyStatus !== 'valid'
+              ? (trainingMode ? 'API 키 설정 대기 중' : 'API 키를 먼저 설정하세요')
+              : (trainingMode ? '수업 시작' : '수업 시작 (이어가기)')}
         </button>
 
+        {/* 연수 모드에서는 남의 수업을 끝내지 않도록 '기존 세션 초기화'를 숨긴다 (서버도 409로 막음) */}
+        {!trainingMode && (<>
         <button
           onClick={() => handleStart({ forceNew: true })}
           disabled={loading || apiKeyStatus !== 'valid'}
@@ -252,12 +308,12 @@ export default function ClassSetup({ onSessionCreated, onAuthExpired }) {
             marginTop: '8px',
             width: '100%',
             padding: '10px',
-            background: 'transparent',
-            color: 'var(--text-muted)',
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--radius)',
+            background: '#fff',
+            color: 'var(--accent-text)',
+            border: '1.5px solid var(--gold)',
+            borderRadius: 'var(--radius-btn)',
             fontSize: '0.8125rem',
-            fontWeight: 600,
+            fontWeight: 700,
             cursor: (loading || apiKeyStatus !== 'valid') ? 'not-allowed' : 'pointer',
           }}
         >
@@ -266,6 +322,7 @@ export default function ClassSetup({ onSessionCreated, onAuthExpired }) {
         <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '6px', textAlign: 'center' }}>
           같은 수업 코드로 시작하면 기존 수업과 팀 구성을 그대로 이어갑니다
         </p>
+        </>)}
       </div>
     </div>
   )
@@ -282,8 +339,8 @@ const labelStyle = {
 
 const inputStyle = {
   width: '100%',
-  padding: '10px 12px',
-  background: 'var(--bg)',
+  padding: '12px 14px',
+  background: 'var(--card2)',
   border: '1px solid var(--border)',
   borderRadius: 'var(--radius)',
   color: 'var(--text)',

@@ -11,12 +11,12 @@ primary_region = 'nrt'
 [http_service]
   internal_port = 4009
   force_https = true
-  # 요청 시 기동(2026-09-03 전환). 유휴 시 정지되고 첫 접속에 5~10초 지연이 생긴다.
-  # 수업 시작에 학생이 동시에 몰려 콜드 스타트가 문제되면
-  # auto_stop_machines = 'off' / min_machines_running = 1 로 되돌릴 것.
-  auto_stop_machines = 'stop'
+  # 상시 가동(2026-10-27, 교사 연수 10-28~29 대비). 자동 기동 실패로 접속이
+  # 막히는 일이 있어 연수 기간에는 정지하지 않는다. 연수 뒤 비용을 줄이려면
+  # auto_stop_machines = 'stop' / min_machines_running = 0 으로 되돌릴 것.
+  auto_stop_machines = 'off'
   auto_start_machines = true
-  min_machines_running = 0
+  min_machines_running = 1
   processes = ['app']
 
   # 헬스체크가 없으면 재시작 직후 Node가 뜨기 전에 프록시가 요청을 넘겨

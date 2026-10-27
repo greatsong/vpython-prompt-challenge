@@ -22,9 +22,9 @@ export default function PrivacyPage() {
           style={{
             background: 'none',
             border: 'none',
-            color: 'var(--accent)',
+            color: 'var(--accent-text)',
             fontSize: '0.875rem',
-            fontWeight: 600,
+            fontWeight: 700,
             marginBottom: '20px',
             padding: '4px 0',
           }}
@@ -36,9 +36,10 @@ export default function PrivacyPage() {
           background: 'var(--surface)',
           border: '1px solid var(--border)',
           borderRadius: 'var(--radius-lg)',
+          boxShadow: 'var(--shadow-md)',
           padding: '32px',
         }}>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: 700, marginBottom: '4px' }}>
+          <h1 style={{ fontSize: '1.5rem', fontWeight: 800, marginBottom: '4px' }}>
             개인정보 처리방침
           </h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.8125rem', marginBottom: '28px' }}>
@@ -114,7 +115,7 @@ const ulStyle = {
 const infoBoxStyle = {
   marginTop: '12px',
   padding: '14px 16px',
-  background: 'var(--bg)',
+  background: 'var(--card)',
   borderRadius: 'var(--radius)',
   border: '1px solid var(--border)',
   fontSize: '0.875rem',

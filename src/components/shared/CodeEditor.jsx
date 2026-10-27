@@ -1,6 +1,18 @@
-import ReactCodeMirror from '@uiw/react-codemirror'
+import ReactCodeMirror, { EditorView } from '@uiw/react-codemirror'
 import { python } from '@codemirror/lang-python'
-import { oneDark } from '@codemirror/theme-one-dark'
+
+// 라이트 테마: 흰 바탕 + 크림색 줄 번호 영역 + 노란 선택·커서 강조
+const lightTheme = EditorView.theme({
+  '&': { backgroundColor: '#fff', color: '#3A2E1A' },
+  '.cm-content': { caretColor: '#E8930C' },
+  '.cm-cursor, .cm-dropCursor': { borderLeftColor: '#E8930C' },
+  '.cm-gutters': { backgroundColor: '#FFFCF3', color: '#A8987A', borderRight: '1px solid #F0E2BC' },
+  '.cm-activeLine': { backgroundColor: '#FFF9EA' },
+  '.cm-activeLineGutter': { backgroundColor: '#FFF3D6', color: '#8A5A00' },
+  '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, ::selection': { backgroundColor: '#FDE7B0 !important' },
+  '.cm-matchingBracket': { backgroundColor: '#FDD98A', outline: 'none' },
+  '.cm-placeholder': { color: '#B3A37F' },
+}, { dark: false })
 
 /**
  * CodeEditor — CodeMirror 6 래퍼
@@ -35,14 +47,15 @@ export default function CodeEditor({
         borderRadius: 'var(--radius)',
         overflow: 'hidden',
         border: '1px solid var(--border)',
+        background: '#fff',
         fontSize: '0.875rem',
       }}
     >
       <ReactCodeMirror
         value={value}
         onChange={onChange}
-        extensions={[python()]}
-        theme={oneDark}
+        extensions={[python(), lightTheme]}
+        theme="light"
         readOnly={readOnly}
         placeholder={placeholder}
         basicSetup={{

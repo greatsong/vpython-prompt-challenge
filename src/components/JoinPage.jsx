@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { setTeamToken } from '../utils/teamAuth.js'
 
 const LS_TEACHER_CODE = 'vpython_teacher_code'
@@ -7,7 +7,7 @@ const LS_TEACHER_CODE = 'vpython_teacher_code'
 // 사용자가 명시적으로 클릭해야 복원되도록 한다.
 
 const WELCOME_EMOJIS = ['🎉', '🚀', '⭐', '🔥', '💎', '🌟', '✨', '🎯', '🧠', '💡']
-const CONFETTI_COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899', '#06b6d4']
+const CONFETTI_COLORS = ['#F4B400', '#E8930C', '#FDD98A', '#2E9E5B', '#4C8DF6', '#F4789B', '#FFC94D', '#8FD3A8']
 
 function Confetti() {
   const pieces = Array.from({ length: 40 }, (_, i) => ({
@@ -53,6 +53,7 @@ function codeFromUrl() {
 
 export default function JoinPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [teacherCode, setTeacherCode] = useState(codeFromUrl)
   const [lastTeacherCode] = useState(() => localStorage.getItem(LS_TEACHER_CODE) || '')
   const [s1Number, setS1Number] = useState('')
@@ -60,7 +61,8 @@ export default function JoinPage() {
   const [s2Number, setS2Number] = useState('')
   const [s2Name, setS2Name] = useState('')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  // 팀 화면에서 인증이 풀려 돌아온 경우(TeamApp이 state.notice로 넘긴다) 그 이유를 먼저 보여 준다
+  const [error, setError] = useState(() => (typeof location.state?.notice === 'string' ? location.state.notice : ''))
   const [welcome, setWelcome] = useState(null)
   // alreadyRegistered 응답을 받았을 때의 선택 상태
   const [existingChoice, setExistingChoice] = useState(null)
@@ -71,9 +73,10 @@ export default function JoinPage() {
 
   const submitRegister = async (opts = {}) => {
     const { forceNewTeam = false } = opts
-    const students = [{ studentNumber: s1Number.trim(), studentName: s1Name.trim() }]
-    if (s2Number.trim() && s2Name.trim()) {
-      students.push({ studentNumber: s2Number.trim(), studentName: s2Name.trim() })
+    // 학번은 항상 문자열로 보낸다 (서버는 숫자형 학번을 거부한다 — 앞자리 0이 사라지는 것을 막기 위해)
+    const students = [{ studentNumber: String(s1Number).trim(), studentName: String(s1Name).trim() }]
+    if (String(s2Number).trim() && String(s2Name).trim()) {
+      students.push({ studentNumber: String(s2Number).trim(), studentName: String(s2Name).trim() })
     }
 
     try {
@@ -82,9 +85,16 @@ export default function JoinPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ teacherCode: teacherCode.trim(), students, forceNewTeam }),
       })
-      const data = await res.json()
+      let data = {}
+      try { data = await res.json() } catch { /* 본문이 JSON이 아니면 아래 기본 문구 */ }
       if (!res.ok) {
-        setError(data.error || '등록 실패')
+        // 400: 입력 검증 실패(서버 문구 그대로) · 409: 이미 등록된 학번인데 이름이 다름 · 404: 수업 없음
+        const fallback = res.status === 409
+          ? '이미 등록된 학번입니다. 이름을 확인하세요'
+          : res.status >= 500
+            ? '서버가 잠시 불안정합니다. 잠시 후 다시 시도해주세요.'
+            : '등록 실패'
+        setError(data?.error || fallback)
         setLoading(false)
         setExistingChoice(null)
         return
@@ -125,6 +135,10 @@ export default function JoinPage() {
           teamToken: data.teamToken,
           spectator: false,
           students,
+          // 기존 팀에 새 짝을 더했으면 그 이름, 정원이 차서 못 더했으면 안내 문구
+          addedMembers: Array.isArray(data.addedMembers) ? data.addedMembers : [],
+          partnerNotAdded: !!data.partnerNotAdded,
+          message: data.message,
         })
         setLoading(false)
         return
@@ -148,6 +162,9 @@ export default function JoinPage() {
     // 팀원 2는 둘 다 비어있으면 OK, 하나만 입력하면 경고
     if ((s2Number.trim() && !s2Name.trim()) || (!s2Number.trim() && s2Name.trim()))
       return setError('팀원 2의 학번과 이름을 모두 입력해주세요')
+    // 두 팀원의 학번이 같으면 서버에 보내기 전에 막는다
+    if (s2Number.trim() && s2Number.trim() === s1Number.trim())
+      return setError('두 팀원의 학번이 같습니다. 학번을 확인해주세요')
 
     setLoading(true)
     setError('')
@@ -198,8 +215,9 @@ export default function JoinPage() {
           width: '100%',
           maxWidth: '440px',
           background: 'var(--surface)',
-          border: '2px solid #f97316',
+          border: '2px solid var(--gold)',
           borderRadius: 'var(--radius-lg)',
+          boxShadow: 'var(--shadow-md)',
           padding: '28px',
           animation: 'fadeIn 0.4s ease-out',
         }}>
@@ -208,9 +226,9 @@ export default function JoinPage() {
             alignItems: 'center',
             gap: '6px',
             padding: '4px 12px',
-            background: '#f97316',
-            color: 'white',
-            borderRadius: '20px',
+            background: '#FDD98A',
+            color: 'var(--warning-text)',
+            borderRadius: 'var(--radius-pill)',
             fontSize: '0.75rem',
             fontWeight: 800,
             marginBottom: '14px',
@@ -235,12 +253,13 @@ export default function JoinPage() {
             style={{
               width: '100%',
               padding: '13px',
-              background: '#f97316',
-              color: 'white',
+              background: 'var(--btn-primary-bg)',
+              color: 'var(--btn-primary-text)',
               border: 'none',
-              borderRadius: 'var(--radius)',
+              borderRadius: 'var(--radius-btn)',
+              boxShadow: '0 6px 18px var(--shadow)',
               fontSize: '1rem',
-              fontWeight: 700,
+              fontWeight: 800,
               cursor: 'pointer',
               marginBottom: '10px',
             }}
@@ -284,6 +303,7 @@ export default function JoinPage() {
           background: 'var(--surface)',
           border: '1px solid var(--border)',
           borderRadius: 'var(--radius-lg)',
+          boxShadow: 'var(--shadow-md)',
           padding: '28px',
         }}>
           <h2 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '8px' }}>
@@ -295,8 +315,9 @@ export default function JoinPage() {
           {existingChoice.spectator && existingChoice.reason === 'capacity' && (
             <div style={{
               padding: '12px 14px',
-              background: 'rgba(249, 115, 22, 0.12)',
-              border: '1px solid #f97316',
+              background: 'var(--warning-bg)',
+              border: '1px solid var(--gold)',
+              color: 'var(--warning-text)',
               borderRadius: 'var(--radius)',
               fontSize: '0.8125rem',
               lineHeight: 1.5,
@@ -305,18 +326,47 @@ export default function JoinPage() {
               ⚠️ {existingChoice.message || '정원 초과로 관람 모드입니다. 선생님께 알려주세요.'}
             </div>
           )}
+          {!existingChoice.spectator && existingChoice.addedMembers?.length > 0 && (
+            <div style={{
+              padding: '12px 14px',
+              background: 'var(--warning-bg)',
+              border: '1px solid var(--gold)',
+              color: 'var(--warning-text)',
+              borderRadius: 'var(--radius)',
+              fontSize: '0.8125rem',
+              lineHeight: 1.5,
+              marginBottom: '16px',
+            }}>
+              ✅ {existingChoice.addedMembers.join(', ')} 학생을 이전 팀에 함께 넣었어요.
+            </div>
+          )}
+          {!existingChoice.spectator && existingChoice.partnerNotAdded && (
+            <div style={{
+              padding: '12px 14px',
+              background: 'var(--warning-bg)',
+              border: '1px solid var(--gold)',
+              color: 'var(--warning-text)',
+              borderRadius: 'var(--radius)',
+              fontSize: '0.8125rem',
+              lineHeight: 1.5,
+              marginBottom: '16px',
+            }}>
+              ⚠️ {existingChoice.message || '기존 팀이 이미 가득 차서 새 짝을 넣지 못했습니다. 함께하려면 새 팀으로 시작하세요.'}
+            </div>
+          )}
           <button
             onClick={handleEnterExisting}
             disabled={loading}
             style={{
               width: '100%',
               padding: '12px',
-              background: 'var(--accent)',
-              color: 'white',
+              background: 'var(--btn-primary-bg)',
+              color: 'var(--btn-primary-text)',
               border: 'none',
-              borderRadius: 'var(--radius)',
+              borderRadius: 'var(--radius-btn)',
+              boxShadow: '0 6px 18px var(--shadow)',
               fontSize: '1rem',
-              fontWeight: 700,
+              fontWeight: 800,
               cursor: loading ? 'not-allowed' : 'pointer',
               marginBottom: '10px',
             }}
@@ -329,10 +379,10 @@ export default function JoinPage() {
             style={{
               width: '100%',
               padding: '12px',
-              background: 'transparent',
-              color: 'var(--text)',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--radius)',
+              background: '#fff',
+              color: 'var(--accent-text)',
+              border: '1.5px solid var(--gold)',
+              borderRadius: 'var(--radius-btn)',
               fontSize: '0.9375rem',
               fontWeight: 600,
               cursor: loading ? 'not-allowed' : 'pointer',
@@ -398,10 +448,12 @@ export default function JoinPage() {
           <div style={{
             marginTop: '8px',
             padding: '10px 24px',
-            background: 'var(--accent)',
-            borderRadius: 'var(--radius-lg)',
+            background: '#FDD98A',
+            color: 'var(--text)',
+            borderRadius: 'var(--radius-pill)',
+            boxShadow: 'var(--shadow-sm)',
             fontSize: '0.875rem',
-            fontWeight: 600,
+            fontWeight: 800,
             animation: 'slideUp 0.5s 0.7s ease-out both, pulse 1.5s 1.2s ease-in-out infinite',
           }}>
             준비되셨나요? 🧠
@@ -426,6 +478,7 @@ export default function JoinPage() {
         background: 'var(--surface)',
         border: '1px solid var(--border)',
         borderRadius: 'var(--radius-lg)',
+        boxShadow: 'var(--shadow-md)',
         padding: '32px',
         animation: 'fadeIn 0.4s ease-out',
       }}>
@@ -433,7 +486,7 @@ export default function JoinPage() {
             clamp: 좁은 화면(320px)에서는 글자를 줄여 두 줄로 흘러넘치지 않게 한다. */}
         <h1 style={{
           fontSize: 'clamp(1.15rem, 5.5vw, 1.5rem)',
-          fontWeight: 700,
+          fontWeight: 800,
           marginBottom: '6px',
           textAlign: 'center',
           wordBreak: 'keep-all',
@@ -479,7 +532,7 @@ export default function JoinPage() {
         <div style={{
           marginTop: '20px',
           padding: '16px',
-          background: 'var(--bg)',
+          background: 'var(--card)',
           borderRadius: 'var(--radius)',
           border: '1px solid var(--border)',
         }}>
@@ -514,7 +567,7 @@ export default function JoinPage() {
         <div style={{
           marginTop: '10px',
           padding: '16px',
-          background: 'var(--bg)',
+          background: 'var(--card2)',
           borderRadius: 'var(--radius)',
           border: '1px dashed var(--border)',
         }}>
@@ -547,7 +600,7 @@ export default function JoinPage() {
 
         {error && (
           <p style={{
-            color: 'var(--danger)',
+            color: 'var(--danger-text)',
             fontSize: '0.875rem',
             marginTop: '12px',
             animation: 'fadeIn 0.3s',
@@ -563,12 +616,13 @@ export default function JoinPage() {
             marginTop: '20px',
             width: '100%',
             padding: '14px',
-            background: loading ? 'var(--surface2)' : 'var(--accent)',
-            color: 'white',
+            background: loading ? 'var(--card)' : 'var(--btn-primary-bg)',
+            color: loading ? 'var(--text-muted)' : 'var(--btn-primary-text)',
             border: 'none',
-            borderRadius: 'var(--radius)',
+            borderRadius: 'var(--radius-btn)',
+            boxShadow: loading ? 'none' : '0 6px 18px var(--shadow)',
             fontSize: '1.0625rem',
-            fontWeight: 700,
+            fontWeight: 800,
             cursor: loading ? 'not-allowed' : 'pointer',
             transition: 'background 0.2s, transform 0.1s',
           }}

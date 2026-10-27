@@ -4,10 +4,40 @@ import useSessionStore from '../../store/sessionStore.js'
 import useTeamStore from '../../store/teamStore.js'
 import VPythonRunner from '../shared/VPythonRunner.jsx'
 import { generateCode } from '../../utils/claude.js'
-import { teacherFetch } from '../../utils/teacherAuth.js'
+import { teacherFetch, clearTeacherToken, getTeacherToken } from '../../utils/teacherAuth.js'
+import { BATTLE_CHALLENGES } from '../../data/challenges-battle.js'
 
-export default function ClassDashboard({ sessionId }) {
-  const { currentChallenge, setSubmissionProgress } = useSessionStore()
+// 챌린지 id → 제목 (최종 결과에 id 대신 제목을 보여 준다)
+const CHALLENGE_TITLES = Object.fromEntries(BATTLE_CHALLENGES.map((c) => [c.id, `${c.emoji || ''} ${c.title}`.trim()]))
+function challengeTitle(id) {
+  return CHALLENGE_TITLES[id] || id
+}
+
+// 순위 응답의 미제출 판정.
+// 서버가 submitted 필드를 주면 그것을 따르고, 없으면(예전 응답) prompt·generated_code가 모두 없는지로 가린다.
+// 미제출 팀도 서버는 0점을 넣어 보내므로 점수로는 가릴 수 없다.
+function isUnsubmitted(r) {
+  if (!r) return false
+  if (r.submitted === false) return true
+  if (r.submitted === true) return false
+  return r.prompt == null && r.generated_code == null
+}
+
+// 화면에 보일 순위 — 제출한 팀끼리만 번호를 매긴다(미제출은 null). 서버가 rank를 주면 그 값을 쓴다.
+function displayRanks(rankings) {
+  let n = 0
+  return (rankings || []).map((r) => {
+    if (isUnsubmitted(r)) return null
+    n = Number.isInteger(r.rank) ? r.rank : n + 1
+    return n
+  })
+}
+
+// TeacherApp의 인증 플래그 키 (TeacherApp.jsx의 AUTH_KEY와 같아야 한다)
+const TEACHER_AUTH_KEY = 'vpython_teacher_auth'
+
+export default function ClassDashboard({ sessionId, onAuthExpired }) {
+  const { currentChallenge, setSubmissionProgress, challengeStatus } = useSessionStore()
   const { teams, setTeams } = useTeamStore()
   const socketRef = useRef(null)
   const challengeIdRef = useRef(null)
@@ -35,25 +65,71 @@ export default function ClassDashboard({ sessionId }) {
 
   // 챌린지별 순위표
   const [challengeRankings, setChallengeRankings] = useState(null)
+  // setTimeout 안에서 최신 값을 읽기 위한 ref (클로저에 갇힌 옛 값 방지)
+  const challengeRankingsRef = useRef(null)
+  useEffect(() => { challengeRankingsRef.current = challengeRankings }, [challengeRankings])
   // 최종 결과
   const [finalResults, setFinalResults] = useState(null)
+  // 교사 토큰 만료 — 화면을 지우지 않고 다시 로그인하라는 안내를 띄운다
+  const [authExpired, setAuthExpired] = useState(false)
+  // 목표 장면 코드 — 챌린지 목록(/api/challenges, 클라이언트 번들)에는 정답 코드가 없어서
+  // 단건 조회(/api/challenges/:id)로 따로 받아 온다
+  const [targetCode, setTargetCode] = useState(null)
+
+  const markAuthExpired = () => {
+    setAuthExpired(true)
+  }
+
+  // 다시 로그인 — TeacherApp은 이 컴포넌트에서 고칠 수 없으므로,
+  // 부모가 콜백을 넘겼으면 그것을 쓰고 아니면 토큰을 지운 뒤 새로고침해 로그인 화면으로 돌아간다
+  const handleRelogin = () => {
+    if (onAuthExpired) {
+      onAuthExpired()
+      return
+    }
+    clearTeacherToken()
+    try { sessionStorage.removeItem(TEACHER_AUTH_KEY) } catch { /* 무시 */ }
+    window.location.reload()
+  }
 
   const loadTeams = async () => {
     const cid = challengeIdRef.current
     const url = cid
       ? `/api/dashboard/${sessionId}?challengeId=${cid}`
       : `/api/dashboard/${sessionId}`
-    const res = await teacherFetch(url)
-    const data = await res.json()
+    let res
+    let data
+    try {
+      res = await teacherFetch(url)
+      if (res.status === 401) {
+        markAuthExpired()
+        return
+      }
+      if (!res.ok) return // 일시적 서버 오류 — 기존 화면을 유지하고 다음 갱신을 기다린다
+      data = await res.json()
+    } catch (e) {
+      console.error('[ClassDashboard] 팀 현황 조회 실패', e)
+      return
+    }
     // 응답이 오는 사이에 챌린지가 바뀌었으면 이전 라운드 데이터이므로 버린다
     if (challengeIdRef.current !== cid) return
-    setTeams(data.teams)
+    setAuthExpired(false)
+    setTeams(Array.isArray(data?.teams) ? data.teams : [])
     setLoadedChallengeId(cid)
-    if (data.maxTeams) setMaxTeams(data.maxTeams)
+    if (data?.maxTeams) setMaxTeams(data.maxTeams)
   }
 
   const downloadCsv = async (url, filename) => {
-    const res = await teacherFetch(url)
+    let res
+    try {
+      res = await teacherFetch(url)
+    } catch {
+      return
+    }
+    if (res.status === 401) {
+      markAuthExpired()
+      return
+    }
     if (!res.ok) return
     const blob = await res.blob()
     const objectUrl = URL.createObjectURL(blob)
@@ -78,17 +154,39 @@ export default function ClassDashboard({ sessionId }) {
     setCompareData({})
   }, [currentChallenge?.id])
 
+  // 목표 장면 코드 조회 — 응답이 늦게 와도 지금 챌린지와 같을 때만 반영한다
+  useEffect(() => {
+    const cid = currentChallenge?.id
+    setTargetCode(currentChallenge?.code || null)
+    if (!cid || currentChallenge?.code) return
+    let cancelled = false
+    fetch(`/api/challenges/${encodeURIComponent(cid)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (cancelled || !data || data.id !== cid) return
+        setTargetCode(data.code || null)
+      })
+      .catch(() => { /* 목표 장면만 비워 둔다 */ })
+    return () => { cancelled = true }
+  }, [currentChallenge?.id])
+
   useEffect(() => {
     const socket = createSocket({ teacher: true })
     socketRef.current = socket
-    socket.emit('teacher:join', { sessionId })
+    // token을 함께 보내 auth:teacher 도착 순서와 상관없이 바로 교사 방에 들어간다
+    const join = () => {
+      const token = getTeacherToken()
+      socket.emit('teacher:join', token ? { sessionId, token } : { sessionId }, (res) => {
+        if (res && res.ok === false && res.authExpired) markAuthExpired()
+      })
+    }
+    join()
 
     // 재연결 시 방 재참여 (배포/네트워크 끊김 후 복구)
-    socket.on('connect', () => {
-      socket.emit('teacher:join', { sessionId })
-    })
+    socket.on('connect', join)
 
     // 소켓 이벤트에서 loadTeams 호출 시 challengeIdRef로 최신 값 사용
+    // team:submitted는 { teamId, score }만 담는다 — 상세 평가는 loadTeams로 다시 읽는다
     socket.on('team:submitted', () => loadTeams())
     socket.on('dashboard:update', () => loadTeams())
 
@@ -148,25 +246,29 @@ export default function ClassDashboard({ sessionId }) {
   }, [progressReady, currentChallenge?.id, submittedCount, activeTeamCount])
 
   const handleReveal = () => {
-    socketRef.current?.emit('challenge:reveal', {
-      sessionId,
-      challengeId: currentChallenge?.id,
+    const cid = currentChallenge?.id
+    // 인증이 만료됐으면 서버가 ack로 알려 준다
+    socketRef.current?.emit('challenge:reveal', { sessionId, challengeId: cid }, (res) => {
+      if (res && res.ok === false && res.authExpired) markAuthExpired()
     })
     // 소켓 이벤트 수신 실패 대비: 직접 API로 순위 조회
+    // (ref로 최신 값을 읽는다 — 상태를 직접 읽으면 클릭 당시의 null에 갇혀 늘 다시 조회했다)
     setTimeout(async () => {
-      if (!challengeRankings) {
-        try {
-          const cid = currentChallenge?.id
-          const url = cid
-            ? `/api/dashboard/rankings/${sessionId}?challengeId=${cid}`
-            : `/api/dashboard/rankings/${sessionId}`
-          const res = await teacherFetch(url)
-          if (res.ok) {
-            const data = await res.json()
-            if (data.rankings) setChallengeRankings(data.rankings)
-          }
-        } catch { /* ignore */ }
-      }
+      if (challengeRankingsRef.current) return
+      try {
+        const url = cid
+          ? `/api/dashboard/rankings/${sessionId}?challengeId=${cid}`
+          : `/api/dashboard/rankings/${sessionId}`
+        const res = await teacherFetch(url)
+        if (res.status === 401) {
+          markAuthExpired()
+          return
+        }
+        if (res.ok) {
+          const data = await res.json()
+          if (data.rankings && !challengeRankingsRef.current) setChallengeRankings(data.rankings)
+        }
+      } catch { /* ignore */ }
     }, 1000)
   }
 
@@ -202,6 +304,10 @@ export default function ClassDashboard({ sessionId }) {
         ? `/api/dashboard/attempts/${sessionId}/${team.id}?challengeId=${cid}`
         : `/api/dashboard/attempts/${sessionId}/${team.id}`
       const res = await teacherFetch(url)
+      if (res.status === 401) {
+        markAuthExpired()
+        return
+      }
       if (res.ok) {
         const data = await res.json()
         setCompareData(prev => ({ ...prev, [team.id]: data }))
@@ -217,7 +323,9 @@ export default function ClassDashboard({ sessionId }) {
         <div style={{
           textAlign: 'center',
           padding: '32px 20px',
-          background: 'linear-gradient(135deg, rgba(234,179,8,0.1), rgba(99,102,241,0.1))',
+          background: 'linear-gradient(135deg, #FFF3CC, #FFFCF3)',
+          border: '1px solid var(--border)',
+          boxShadow: 'var(--shadow-md)',
           borderRadius: 'var(--radius-lg)',
           marginBottom: '24px',
         }}>
@@ -225,7 +333,7 @@ export default function ClassDashboard({ sessionId }) {
             🏆 최종 결과
           </h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem' }}>
-            {rankings.length}팀 · {challengeCount}개 챌린지 종합
+            {(rankings || []).length}팀 · {challengeCount}개 챌린지 종합
           </p>
         </div>
 
@@ -234,10 +342,11 @@ export default function ClassDashboard({ sessionId }) {
           background: 'var(--surface)',
           border: '1px solid var(--border)',
           borderRadius: 'var(--radius-lg)',
-          padding: '20px',
+          boxShadow: 'var(--shadow-md)',
+          padding: '24px',
           marginBottom: '24px',
         }}>
-          <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '16px' }}>
+          <h3 style={{ fontSize: '1rem', fontWeight: 800, marginBottom: '16px' }}>
             종합 순위
           </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -250,13 +359,13 @@ export default function ClassDashboard({ sessionId }) {
                   gap: '16px',
                   padding: '12px 16px',
                   background: i === 0
-                    ? 'rgba(234,179,8,0.12)'
+                    ? 'var(--card)'
                     : i === 1
-                      ? 'rgba(192,192,192,0.1)'
+                      ? '#F5F6F8'
                       : i === 2
-                        ? 'rgba(205,127,50,0.1)'
-                        : 'var(--bg)',
-                  border: `1px solid ${i < 3 ? ['#eab308', '#a0a0a0', '#cd7f32'][i] : 'var(--border)'}`,
+                        ? '#FBF0E6'
+                        : i % 2 === 0 ? 'var(--card2)' : 'var(--surface)',
+                  border: `1px solid ${i < 3 ? ['var(--gold)', '#B9BFC8', '#D9A27A'][i] : 'var(--border)'}`,
                   borderRadius: 'var(--radius)',
                 }}
               >
@@ -270,12 +379,12 @@ export default function ClassDashboard({ sessionId }) {
                 <div style={{ flex: 1 }}>
                   <span style={{ fontWeight: 700, fontSize: '0.9375rem' }}>{r.teamName}</span>
                   <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginLeft: '8px' }}>
-                    {r.members.join(', ')}
+                    {(r.members || []).join(', ')}
                   </span>
                 </div>
                 <span style={{
                   fontSize: '1.5rem', fontWeight: 800,
-                  color: i === 0 ? '#eab308' : 'var(--accent)',
+                  color: 'var(--accent-text)',
                 }}>
                   {r.totalScore}점
                 </span>
@@ -289,16 +398,17 @@ export default function ClassDashboard({ sessionId }) {
           background: 'var(--surface)',
           border: '1px solid var(--border)',
           borderRadius: 'var(--radius-lg)',
-          padding: '20px',
+          boxShadow: 'var(--shadow-md)',
+          padding: '24px',
           marginBottom: '24px',
         }}>
-          <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '16px' }}>
+          <h3 style={{ fontSize: '1rem', fontWeight: 800, marginBottom: '16px' }}>
             팀별 프롬프트 & 피드백
           </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
             {rankings.map((r, i) => (
               <details key={r.teamId} open={i < 3} style={{
-                background: 'var(--bg)',
+                background: 'var(--card2)',
                 borderRadius: 'var(--radius)',
                 border: `1px solid ${r.teamColor}33`,
                 overflow: 'hidden',
@@ -336,10 +446,10 @@ export default function ClassDashboard({ sessionId }) {
                         marginBottom: '6px',
                       }}>
                         <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>
-                          {cr.challengeId}
+                          {challengeTitle(cr.challengeId)}
                         </span>
-                        <span style={{ fontSize: '0.875rem', fontWeight: 800, color: 'var(--accent)' }}>
-                          {cr.score}점
+                        <span style={{ fontSize: '0.875rem', fontWeight: 800, color: cr.prompt ? 'var(--accent-text)' : 'var(--text-muted)' }}>
+                          {cr.prompt ? `${cr.score}점` : '미제출'}
                         </span>
                       </div>
                       {cr.prompt ? (
@@ -347,8 +457,8 @@ export default function ClassDashboard({ sessionId }) {
                           <div style={{
                             fontSize: '0.8125rem',
                             lineHeight: 1.6,
-                            padding: '8px',
-                            background: 'var(--bg)',
+                            padding: '8px 10px',
+                            background: 'var(--card2)',
                             borderRadius: 'var(--radius)',
                             marginBottom: '6px',
                             borderLeft: `3px solid ${r.teamColor}`,
@@ -360,8 +470,8 @@ export default function ClassDashboard({ sessionId }) {
                               💬 {cr.feedback}
                             </p>
                           )}
-                          {cr.strengths.length > 0 && (
-                            <p style={{ fontSize: '0.75rem', color: 'var(--success)', marginTop: '4px' }}>
+                          {cr.strengths?.length > 0 && (
+                            <p style={{ fontSize: '0.75rem', color: 'var(--success-text)', marginTop: '4px' }}>
                               ✨ {cr.strengths.join(' / ')}
                             </p>
                           )}
@@ -384,12 +494,13 @@ export default function ClassDashboard({ sessionId }) {
             style={{
               display: 'inline-block',
               padding: '12px 32px',
-              background: 'var(--accent)',
-              color: 'white',
-              borderRadius: 'var(--radius)',
+              background: 'var(--btn-primary-bg)',
+              color: 'var(--btn-primary-text)',
+              borderRadius: 'var(--radius-btn)',
+              boxShadow: '0 6px 18px var(--shadow)',
               border: 'none',
               fontSize: '0.9375rem',
-              fontWeight: 700,
+              fontWeight: 800,
               cursor: 'pointer',
             }}
           >
@@ -402,32 +513,67 @@ export default function ClassDashboard({ sessionId }) {
 
   return (
     <div>
+      {/* 교사 로그인 만료 안내 — 예전에는 응답 오류로 화면 전체가 하얗게 사라졌다 */}
+      {authExpired && (
+        <div role="alert" style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          flexWrap: 'wrap',
+          padding: '14px 18px',
+          marginBottom: '16px',
+          background: 'var(--danger-bg)',
+          border: '2px solid var(--danger)',
+          borderRadius: 'var(--radius-lg)',
+        }}>
+          <span style={{ fontWeight: 700, flex: 1, color: 'var(--danger-text)' }}>
+            ⚠️ 로그인이 만료되었습니다. 다시 로그인해 주세요.
+          </span>
+          <button
+            onClick={handleRelogin}
+            style={{
+              padding: '8px 16px',
+              background: 'var(--danger-text)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 'var(--radius-btn)',
+              fontSize: '0.875rem',
+              fontWeight: 800,
+              cursor: 'pointer',
+            }}
+          >
+            다시 로그인
+          </button>
+        </div>
+      )}
+
       {/* 헤더 */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
         <div>
-          <h1 style={{ fontSize: '1.25rem', fontWeight: 700 }}>
+          <h1 style={{ fontSize: '1.25rem', fontWeight: 800 }}>
             🧠 VPython 프롬프트 챌린지
           </h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginTop: '2px' }}>
             {maxTeams ? `${teams.length} / ${maxTeams}팀 참여 중` : `${teams.length}팀 참여 중`}
             {maxTeams && teams.length >= maxTeams && (
-              <span style={{ color: '#f97316', fontWeight: 700, marginLeft: '8px' }}>
+              <span style={{ color: 'var(--warning-text)', background: 'var(--warning-bg)', padding: '2px 10px', borderRadius: 'var(--radius-pill)', fontWeight: 700, marginLeft: '8px' }}>
                 ⚠️ 정원 마감 — 이후 참여자는 관람 모드로 들어갑니다
               </span>
             )}
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           <button
             onClick={() => setShowChat(!showChat)}
             style={{
               padding: '8px 16px',
-              background: showChat ? 'var(--accent)' : 'var(--surface2)',
-              color: showChat ? 'white' : 'var(--text)',
-              border: 'none',
-              borderRadius: 'var(--radius)',
+              background: showChat ? 'var(--btn-primary-bg)' : '#fff',
+              color: showChat ? 'var(--btn-primary-text)' : 'var(--text)',
+              border: `1.5px solid ${showChat ? 'var(--gold)' : 'var(--border)'}`,
+              borderRadius: 'var(--radius-btn)',
               fontSize: '0.875rem',
+              fontWeight: showChat ? 800 : 600,
               cursor: 'pointer',
               position: 'relative',
             }}
@@ -445,11 +591,12 @@ export default function ClassDashboard({ sessionId }) {
             onClick={() => { setShowDemo(!showDemo); setCompareTeams([]) }}
             style={{
               padding: '8px 16px',
-              background: showDemo ? 'var(--warning)' : 'var(--surface2)',
-              color: showDemo ? 'white' : 'var(--text)',
-              border: 'none',
-              borderRadius: 'var(--radius)',
+              background: showDemo ? '#FDD98A' : '#fff',
+              color: 'var(--text)',
+              border: `1.5px solid ${showDemo ? 'var(--gold)' : 'var(--border)'}`,
+              borderRadius: 'var(--radius-btn)',
               fontSize: '0.875rem',
+              fontWeight: showDemo ? 800 : 600,
               cursor: 'pointer',
             }}
           >
@@ -459,30 +606,36 @@ export default function ClassDashboard({ sessionId }) {
             onClick={() => downloadCsv(`/api/export/${sessionId}`, `session-${sessionId}.csv`)}
             style={{
               padding: '8px 16px',
-              background: 'var(--surface2)',
+              background: '#fff',
               color: 'var(--text)',
-              borderRadius: 'var(--radius)',
-              border: 'none',
+              borderRadius: 'var(--radius-btn)',
+              border: '1.5px solid var(--border)',
               fontSize: '0.875rem',
+              fontWeight: 600,
               cursor: 'pointer',
             }}
           >
             📥 CSV
           </button>
-          <button
-            onClick={handleReveal}
-            style={{
-              padding: '8px 16px',
-              background: 'var(--accent)',
-              color: 'white',
-              border: 'none',
-              borderRadius: 'var(--radius)',
-              fontSize: '0.875rem',
-              cursor: 'pointer',
-            }}
-          >
-            🎯 결과 공개
-          </button>
+          {/* 결과 공개는 제출이 마감된 뒤에만 — 진행 중에 공개하면 서버가 진행 중 라운드를 지워 타이머가 사라진다 */}
+          {currentChallenge && challengeStatus === 'ended' && (
+            <button
+              onClick={handleReveal}
+              style={{
+                padding: '8px 16px',
+                background: 'var(--btn-primary-bg)',
+                color: 'var(--btn-primary-text)',
+                border: 'none',
+                borderRadius: 'var(--radius-btn)',
+                boxShadow: '0 6px 18px var(--shadow)',
+                fontSize: '0.875rem',
+                fontWeight: 800,
+                cursor: 'pointer',
+              }}
+            >
+              🎯 결과 공개
+            </button>
+          )}
         </div>
       </div>
 
@@ -495,9 +648,10 @@ export default function ClassDashboard({ sessionId }) {
           flexWrap: 'wrap',
           padding: '16px 20px',
           marginBottom: '16px',
-          background: allSubmitted ? 'rgba(34,197,94,0.1)' : 'rgba(245,158,11,0.1)',
-          border: `2px solid ${allSubmitted ? 'var(--success)' : 'var(--warning)'}`,
+          background: allSubmitted ? 'var(--success-bg)' : 'var(--warning-bg)',
+          border: `2px solid ${allSubmitted ? 'var(--success)' : 'var(--gold)'}`,
           borderRadius: 'var(--radius-lg)',
+          boxShadow: 'var(--shadow-sm)',
         }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
             <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', fontWeight: 600 }}>
@@ -508,7 +662,7 @@ export default function ClassDashboard({ sessionId }) {
               fontWeight: 800,
               lineHeight: 1,
               fontVariantNumeric: 'tabular-nums',
-              color: allSubmitted ? 'var(--success)' : 'var(--warning)',
+              color: allSubmitted ? 'var(--success-text)' : 'var(--accent-text)',
             }}>
               {submittedCount}
             </span>
@@ -522,7 +676,8 @@ export default function ClassDashboard({ sessionId }) {
             flex: 1,
             minWidth: '140px',
             height: '10px',
-            background: 'var(--surface2)',
+            background: '#fff',
+            border: '1px solid var(--border)',
             borderRadius: '999px',
             overflow: 'hidden',
           }}>
@@ -537,7 +692,7 @@ export default function ClassDashboard({ sessionId }) {
           <span style={{
             fontSize: '0.875rem',
             fontWeight: 700,
-            color: allSubmitted ? 'var(--success)' : 'var(--warning)',
+            color: allSubmitted ? 'var(--success-text)' : 'var(--warning-text)',
           }}>
             {activeTeamCount === 0
               ? '아직 참여한 팀이 없습니다'
@@ -545,7 +700,7 @@ export default function ClassDashboard({ sessionId }) {
                 ? '✓ 전원 제출 완료 — 결과 공개해도 됩니다'
                 : submittedCount === 0
                   ? `⏳ 아직 제출한 팀이 없습니다 — ${pendingCount}팀 대기`
-                  : `⏳ 평가 처리 중… ${pendingCount}팀 대기`}
+                  : `⏳ ${pendingCount}팀 미제출`}
           </span>
         </div>
       )}
@@ -553,8 +708,9 @@ export default function ClassDashboard({ sessionId }) {
       {/* 학생 등록 알림 */}
       {recentStudent && (
         <div style={{
-          background: 'linear-gradient(135deg, #22c55e, #14b8a6)',
-          color: 'white',
+          background: 'var(--success-bg)',
+          color: 'var(--success-text)',
+          border: '1.5px solid var(--success)',
           padding: '14px 20px',
           borderRadius: 'var(--radius-lg)',
           marginBottom: '16px',
@@ -564,15 +720,16 @@ export default function ClassDashboard({ sessionId }) {
           alignItems: 'center',
           gap: '12px',
           animation: 'slideUp 0.4s ease-out',
-          boxShadow: '0 4px 20px rgba(34, 197, 94, 0.3)',
+          boxShadow: '0 6px 18px rgba(46, 158, 91, 0.18)',
         }}>
           <span style={{ fontSize: '1.5rem' }}>🎉</span>
           <span>{recentStudent.studentNames.join(', ')}</span>
           <span style={{ opacity: 0.8 }}>→</span>
           <span style={{
             padding: '4px 12px',
-            background: 'rgba(255,255,255,0.2)',
-            borderRadius: '20px',
+            background: '#fff',
+            border: '1px solid var(--success)',
+            borderRadius: 'var(--radius-pill)',
             fontSize: '0.875rem',
           }}>
             {recentStudent.teamName}
@@ -585,9 +742,10 @@ export default function ClassDashboard({ sessionId }) {
       {challengeRankings && (
         <div style={{
           background: 'var(--surface)',
-          border: '2px solid var(--accent)',
+          border: '2px solid var(--gold)',
           borderRadius: 'var(--radius-lg)',
-          padding: '20px',
+          boxShadow: 'var(--shadow-md)',
+          padding: '24px',
           marginBottom: '24px',
           animation: 'slideUp 0.4s ease-out',
         }}>
@@ -602,9 +760,9 @@ export default function ClassDashboard({ sessionId }) {
               onClick={() => setChallengeRankings(null)}
               style={{
                 padding: '4px 12px',
-                background: 'var(--surface2)',
-                border: 'none',
-                borderRadius: 'var(--radius)',
+                background: '#fff',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-pill)',
                 fontSize: '0.75rem',
                 color: 'var(--text-muted)',
                 cursor: 'pointer',
@@ -614,7 +772,12 @@ export default function ClassDashboard({ sessionId }) {
             </button>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-            {challengeRankings.map((r, i) => (
+            {(() => {
+              const ranks = displayRanks(challengeRankings)
+              return challengeRankings.map((r, i) => {
+                const unsubmitted = isUnsubmitted(r)
+                const rank = ranks[i]
+                return (
               <div
                 key={i}
                 style={{
@@ -622,27 +785,38 @@ export default function ClassDashboard({ sessionId }) {
                   alignItems: 'center',
                   gap: '12px',
                   padding: '10px 14px',
-                  background: i === 0 ? 'rgba(234,179,8,0.12)' : 'var(--bg)',
-                  border: `1px solid ${i === 0 ? '#eab308' : 'var(--border)'}`,
+                  background: rank === 1 ? 'var(--card)' : i % 2 === 0 ? 'var(--card2)' : 'var(--surface)',
+                  border: `1px solid ${rank === 1 ? 'var(--gold)' : 'var(--border)'}`,
                   borderRadius: 'var(--radius)',
                 }}
               >
-                <span style={{ fontSize: '1.125rem', width: '28px', textAlign: 'center' }}>
-                  {['🥇', '🥈', '🥉'][i] || `${i + 1}`}
-                </span>
+                {/* 미제출 팀은 메달·순위 번호 없이 '미제출'로만 표시하고 점수 칸은 비운다 */}
+                {unsubmitted ? (
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, minWidth: '28px', textAlign: 'center', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                    미제출
+                  </span>
+                ) : (
+                  <span style={{ fontSize: '1.125rem', width: '28px', textAlign: 'center' }}>
+                    {['🥇', '🥈', '🥉'][rank - 1] || `${rank}`}
+                  </span>
+                )}
                 <div style={{
                   width: '10px', height: '10px', borderRadius: '50%',
                   background: r.color, flexShrink: 0,
                 }} />
                 <span style={{ flex: 1, fontWeight: 600, fontSize: '0.875rem' }}>{r.name}</span>
-                <span style={{
-                  fontSize: '1.125rem', fontWeight: 800,
-                  color: r.score > 0 ? '#eab308' : 'var(--text-muted)',
-                }}>
-                  {r.score}점
-                </span>
+                {!unsubmitted && (
+                  <span style={{
+                    fontSize: '1.125rem', fontWeight: 800,
+                    color: r.score > 0 ? 'var(--accent-text)' : 'var(--text-muted)',
+                  }}>
+                    {r.score}점
+                  </span>
+                )}
               </div>
-            ))}
+                )
+              })
+            })()}
           </div>
         </div>
       )}
@@ -651,12 +825,13 @@ export default function ClassDashboard({ sessionId }) {
       {showDemo && (
         <div style={{
           background: 'var(--surface)',
-          border: '2px solid var(--warning)',
+          border: '2px solid var(--gold)',
           borderRadius: 'var(--radius-lg)',
-          padding: '20px',
+          boxShadow: 'var(--shadow-md)',
+          padding: '24px',
           marginBottom: '24px',
         }}>
-          <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '12px' }}>
+          <h3 style={{ fontSize: '1rem', fontWeight: 800, marginBottom: '12px' }}>
             🎬 교사 데모 — 프롬프트를 입력하면 AI가 3D 장면을 생성합니다
           </h3>
           <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
@@ -668,7 +843,7 @@ export default function ClassDashboard({ sessionId }) {
               style={{
                 flex: 1,
                 padding: '10px 14px',
-                background: 'var(--bg)',
+                background: 'var(--card2)',
                 border: '1px solid var(--border)',
                 borderRadius: 'var(--radius)',
                 color: 'var(--text)',
@@ -680,11 +855,12 @@ export default function ClassDashboard({ sessionId }) {
               disabled={demoLoading}
               style={{
                 padding: '10px 20px',
-                background: 'var(--accent)',
-                color: 'white',
+                background: 'var(--btn-primary-bg)',
+                color: 'var(--btn-primary-text)',
                 border: 'none',
-                borderRadius: 'var(--radius)',
+                borderRadius: 'var(--radius-btn)',
                 fontSize: '0.875rem',
+                fontWeight: 800,
                 cursor: 'pointer',
                 opacity: demoLoading ? 0.6 : 1,
               }}
@@ -697,13 +873,14 @@ export default function ClassDashboard({ sessionId }) {
               <div>
                 <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>AI가 생성한 코드</p>
                 <pre style={{
-                  background: 'var(--bg)',
+                  background: 'var(--card2)',
+                  border: '1px solid var(--border)',
                   padding: '12px',
                   borderRadius: 'var(--radius)',
                   fontSize: '0.75rem',
                   overflow: 'auto',
                   maxHeight: '200px',
-                  color: 'var(--success)',
+                  color: 'var(--success-text)',
                 }}>{demoCode}</pre>
               </div>
               <VPythonRunner code={demoCode} height="250px" label="AI 결과" />
@@ -718,7 +895,8 @@ export default function ClassDashboard({ sessionId }) {
           background: 'var(--surface)',
           border: '1px solid var(--border)',
           borderRadius: 'var(--radius-lg)',
-          padding: '16px',
+          boxShadow: 'var(--shadow-md)',
+          padding: '20px',
           marginBottom: '24px',
           display: 'grid',
           gridTemplateColumns: '1fr 300px',
@@ -726,14 +904,14 @@ export default function ClassDashboard({ sessionId }) {
           alignItems: 'start',
         }}>
           <div>
-            <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '4px' }}>
+            <p style={{ fontSize: '0.75rem', color: 'var(--accent-text)', fontWeight: 700, marginBottom: '4px' }}>
               현재 챌린지 — Lv{currentChallenge.level}
             </p>
-            <h2 style={{ fontSize: '1.125rem', fontWeight: 700 }}>
+            <h2 style={{ fontSize: '1.125rem', fontWeight: 800 }}>
               {currentChallenge.emoji} {currentChallenge.title}
             </h2>
           </div>
-          <VPythonRunner code={currentChallenge.code} height="200px" label="목표 장면" />
+          <VPythonRunner code={targetCode} height="200px" label="목표 장면" />
         </div>
       )}
 
@@ -744,7 +922,7 @@ export default function ClassDashboard({ sessionId }) {
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-        gap: '12px',
+        gap: '14px',
       }}>
         {teams.map((team) => {
           const isSelected = compareTeams.some(t => t.id === team.id)
@@ -756,9 +934,10 @@ export default function ClassDashboard({ sessionId }) {
                 background: 'var(--surface)',
                 border: `2px solid ${isSelected ? team.color : 'var(--border)'}`,
                 borderRadius: 'var(--radius-lg)',
+                boxShadow: isSelected ? 'var(--shadow-md)' : 'var(--shadow-sm)',
                 padding: '16px',
                 cursor: 'pointer',
-                transition: 'border-color 0.15s',
+                transition: 'border-color 0.15s, box-shadow 0.15s',
               }}
             >
               <div style={{
@@ -768,7 +947,7 @@ export default function ClassDashboard({ sessionId }) {
                   width: '12px', height: '12px', borderRadius: '50%',
                   background: team.color, flexShrink: 0,
                 }} />
-                <span style={{ fontWeight: 700, fontSize: '0.9375rem' }}>{team.name}</span>
+                <span style={{ fontWeight: 800, fontSize: '0.9375rem' }}>{team.name}</span>
                 {isSelected && <span style={{ fontSize: '0.75rem', color: team.color }}>✓</span>}
               </div>
 
@@ -780,7 +959,7 @@ export default function ClassDashboard({ sessionId }) {
               {team.hasSubmitted ? (
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                    <span style={{ color: 'var(--success)', fontSize: '0.7rem' }}>✓ 제출 완료</span>
+                    <span style={{ color: 'var(--success-text)', background: 'var(--success-bg)', padding: '1px 8px', borderRadius: 'var(--radius-pill)', fontSize: '0.7rem', fontWeight: 700 }}>✓ 제출 완료</span>
                     <span style={{ fontSize: '1.125rem', fontWeight: 800, color: team.color }}>
                       {team.latestScore}점
                     </span>
@@ -790,10 +969,10 @@ export default function ClassDashboard({ sessionId }) {
                     <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
                       {team.perChallenge.filter(pc => pc.challenge_id !== currentChallenge?.id).map((pc, idx) => (
                         <span key={idx} style={{
-                          padding: '2px 6px',
-                          borderRadius: '4px',
+                          padding: '2px 8px',
+                          borderRadius: 'var(--radius-pill)',
                           fontSize: '0.6875rem',
-                          fontWeight: 600,
+                          fontWeight: 700,
                           background: 'var(--surface2)',
                           color: 'var(--text-muted)',
                         }}>
@@ -812,10 +991,10 @@ export default function ClassDashboard({ sessionId }) {
                   <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '4px' }}>
                     {team.perChallenge.filter(pc => pc.challenge_id !== currentChallenge?.id).map((pc, idx) => (
                       <span key={idx} style={{
-                        padding: '2px 6px',
-                        borderRadius: '4px',
+                        padding: '2px 8px',
+                        borderRadius: 'var(--radius-pill)',
                         fontSize: '0.6875rem',
-                        fontWeight: 600,
+                        fontWeight: 700,
                         background: 'var(--surface2)',
                         color: 'var(--text-muted)',
                       }}>
@@ -841,18 +1020,20 @@ export default function ClassDashboard({ sessionId }) {
           background: 'var(--surface)',
           border: '1px solid var(--border)',
           borderRadius: 'var(--radius-lg)',
-          padding: '20px',
+          boxShadow: 'var(--shadow-md)',
+          padding: '24px',
         }}>
-          <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '16px' }}>
+          <h3 style={{ fontSize: '1rem', fontWeight: 800, marginBottom: '16px' }}>
             🔍 프롬프트 비교
           </h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
             {compareTeams.map(team => {
               const data = compareData[team.id]
-              const best = data?.attempts?.sort((a, b) => b.score - a.score)?.[0]
+              // 상태 배열을 직접 정렬하면 렌더 중에 state가 바뀐다 — 복사본을 정렬한다
+              const best = data?.attempts ? [...data.attempts].sort((a, b) => b.score - a.score)[0] : undefined
               return (
                 <div key={team.id} style={{
-                  background: 'var(--bg)',
+                  background: 'var(--card2)',
                   borderRadius: 'var(--radius)',
                   padding: '16px',
                   border: `2px solid ${team.color}`,
@@ -877,6 +1058,7 @@ export default function ClassDashboard({ sessionId }) {
                       </p>
                       <div style={{
                         background: 'var(--surface)',
+                        border: '1px solid var(--border)',
                         padding: '12px',
                         borderRadius: 'var(--radius)',
                         fontSize: '0.875rem',
@@ -905,9 +1087,10 @@ export default function ClassDashboard({ sessionId }) {
           background: 'var(--surface)',
           border: '1px solid var(--border)',
           borderRadius: 'var(--radius-lg)',
-          padding: '20px',
+          boxShadow: 'var(--shadow-md)',
+          padding: '24px',
         }}>
-          <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '12px' }}>
+          <h3 style={{ fontSize: '1rem', fontWeight: 800, marginBottom: '12px' }}>
             💬 전체 채팅 모니터링
           </h3>
           <div
@@ -931,7 +1114,7 @@ export default function ClassDashboard({ sessionId }) {
                 alignItems: 'flex-start',
                 gap: '8px',
                 padding: '6px 10px',
-                background: 'var(--bg)',
+                background: i % 2 === 0 ? 'var(--card2)' : 'var(--surface)',
                 borderRadius: 'var(--radius)',
                 borderLeft: `3px solid ${msg.teamColor || 'var(--border)'}`,
               }}>

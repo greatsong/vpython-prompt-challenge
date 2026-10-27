@@ -5,6 +5,7 @@ import JoinPage from './components/JoinPage.jsx'
 import SpectatorPage from './components/SpectatorPage.jsx'
 import GuidePage from './components/GuidePage.jsx'
 import PrivacyPage from './components/PrivacyPage.jsx'
+import TrainingPage from './components/TrainingPage.jsx'
 
 export default function App() {
   return (
@@ -12,6 +13,9 @@ export default function App() {
       <Routes>
         {/* 교사 화면 */}
         <Route path="/teacher/*" element={<TeacherApp />} />
+
+        {/* 교사 연수 입장 (연수용 입장 코드 → 교사 화면) */}
+        <Route path="/training" element={<TrainingPage />} />
 
         {/* 팀 선택 화면 (학생 접속점) */}
         <Route path="/join" element={<JoinPage />} />

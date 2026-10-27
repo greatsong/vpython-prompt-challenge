@@ -8,6 +8,8 @@
  *   Level 2 — 현실 사물을 도형으로 분해 (분해 훈련) + 간략 설명만
  *   Level 3 — 반복·규칙 장면을 패턴으로 기술 (알고리즘 훈련) + 간략 설명만
  *   Level 4 — 복합 구조, 힌트 없이 3D 뷰만 보고 (분해+추상화 심화)
+ *             입체 패턴(14 나선 탑, 15 3D 피라미드)도 여기에 둔다. 간략 설명은 유지한다.
+ *             (2026-10-27: 깊이 방향을 추론해야 해 Lv3 평면 패턴보다 어려워 Lv3 → Lv4로 옮김)
  *   Level 5 — 극한 도전, 힌트 없이 복합 구조+패턴 (종합)
  *
  * shapes 필드:
@@ -17,7 +19,7 @@
  * description 필드:
  *   Level 1 — 상세 설명 (가이드)
  *   Level 2~3 — 간략 설명 (방향만 제시)
- *   Level 4~5 — null (3D 뷰만 보고 파악)
+ *   Level 4~5 — null (3D 뷰만 보고 파악). 단 14·15는 Lv3에서 옮겨 와 간략 설명을 유지한다
  *
  * ⚠️ 정답 코드(code)는 이 파일에 없다.
  *    클라이언트 번들에 통째로 들어가면 학생이 23개 문제의 정답을 한 번에 읽을 수 있어
@@ -33,7 +35,7 @@ export const BATTLE_CHALLENGES = [
     level: 1,
     emoji: '🌀',
     title: '포탈',
-    description: '허공에 세워진 청록색 고리 — 게임 속 포탈처럼 보인다',
+    description: '공중에 세워진 청록색 고리 하나',
     shapes: ['고리(ring)'],
     ct: ['추상화'],
     hint: '이 고리가 바닥에 놓여 있나요, 세워져 있나요? 방향을 잘 관찰하세요',
@@ -68,7 +70,7 @@ export const BATTLE_CHALLENGES = [
     description: '버섯 한 송이',
     shapes: null,
     ct: ['분해'],
-    hint: '줄기와 갓을 각각 어떤 도형으로 표현할지 생각해보세요',
+    hint: '줄기와 갓을 각각 어떤 도형으로 나타낼지 정하세요',
   },
   {
     id: 'battle-05',
@@ -88,7 +90,7 @@ export const BATTLE_CHALLENGES = [
     description: '행성 하나',
     shapes: null,
     ct: ['분해'],
-    hint: '본체와 그 주위의 것을 따로 묘사하세요',
+    hint: '가운데 물체와 그 둘레를 감싼 물체를 따로 설명하세요. 둘레 물체가 놓인 방향도 관찰하세요',
   },
   {
     id: 'battle-07',
@@ -150,7 +152,7 @@ export const BATTLE_CHALLENGES = [
     description: '체스판',
     shapes: null,
     ct: ['알고리즘', '패턴인식'],
-    hint: '칸의 크기와 전체 배치, 색상 배치 규칙을 설명하세요',
+    hint: '판이 놓인 방향, 칸의 개수, 색이 바뀌는 규칙을 설명하세요',
   },
   {
     id: 'battle-13',
@@ -162,9 +164,12 @@ export const BATTLE_CHALLENGES = [
     ct: ['패턴인식', '알고리즘'],
     hint: '배열의 크기와 각 줄의 색 순서를 설명하세요',
   },
+
+  // ─── Level 4: 복합 구조 — 힌트 없음, 3D 뷰만 ─────────────────────────
+  // 입체 패턴 두 문제는 깊이 방향을 추론해야 해 Lv3에서 옮겨 왔다(간략 설명 유지)
   {
     id: 'battle-14',
-    level: 3,
+    level: 4,
     emoji: '🌪️',
     title: '나선 탑',
     description: '나선형 탑',
@@ -174,16 +179,14 @@ export const BATTLE_CHALLENGES = [
   },
   {
     id: 'battle-15',
-    level: 3,
+    level: 4,
     emoji: '🏛️',
     title: '3D 피라미드',
     description: '입체 피라미드',
     shapes: null,
     ct: ['패턴인식', '알고리즘', '분해'],
-    hint: '각 층의 가로x세로 개수가 어떤 규칙으로 줄어드는지 설명하세요',
+    hint: '각 층의 가로와 세로 개수가 어떤 규칙으로 줄어드는지 설명하세요',
   },
-
-  // ─── Level 4: 복합 구조 — 힌트 없음, 3D 뷰만 ─────────────────────────
   {
     id: 'battle-16',
     level: 4,
@@ -212,13 +215,13 @@ export const BATTLE_CHALLENGES = [
     description: null,
     shapes: null,
     ct: ['분해', '추상화'],
-    hint: '각 건물의 높이, 너비, 색상을 비교하며 왼쪽부터 순서대로 설명하세요',
+    hint: '왼쪽 건물부터 차례로 높이와 너비, 색이 어떻게 다른지 문장으로 비교하세요',
   },
   {
     id: 'battle-19',
     level: 4,
     emoji: '⚖️',
-    title: '균형 저울',
+    title: '양팔 저울',
     description: null,
     shapes: null,
     ct: ['분해', '추상화'],

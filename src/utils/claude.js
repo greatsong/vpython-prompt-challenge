@@ -18,8 +18,9 @@ async function toReadableError(res) {
   try { text = await res.text() } catch { /* 본문 읽기 실패는 무시 */ }
 
   let message = ''
+  let data = null
   try {
-    const data = JSON.parse(text)
+    data = JSON.parse(text)
     if (data && typeof data.error === 'string') message = data.error
     else if (data && typeof data.message === 'string') message = data.message
   } catch { /* JSON이 아니면 아래 기본 메시지 사용 */ }
@@ -33,6 +34,10 @@ async function toReadableError(res) {
 
   const err = new Error(message)
   err.status = res.status
+  // 서버가 붙여 주는 사유 코드 — 화면이 오류 종류별로 다르게 안내할 때 쓴다
+  // (no_active_challenge · challenge_mismatch · forbidden_code · invalid_code_sig · challenge_closed 등)
+  err.reason = data && typeof data.reason === 'string' ? data.reason : null
+  err.data = data && typeof data === 'object' ? data : null
   return err
 }
 
@@ -50,15 +55,17 @@ function getHeaders(teamId) {
 }
 
 /**
- * 프롬프트로 VPython 코드 생성 (Haiku)
+ * 프롬프트로 VPython 코드 생성 (서버 MODEL_GENERATE — 2026-10-27 현재 claude-sonnet-5-5)
  *
  * repair — 선택. 직전에 만든 코드가 렌더링에 실패했을 때 그 사실을 함께 보낸다.
  *   { previousCode, errorMessage }
  * 서버는 이 정보를 생성 프롬프트에 넣어 "같은 장면을 더 단순한 구조로,
  * 문법적으로 완결된 코드로" 다시 만들게 한다. 없으면 기존과 동일하게 동작한다.
  */
-export async function generateCode(prompt, teamId = null, repair = null) {
+export async function generateCode(prompt, teamId = null, repair = null, challengeId = null) {
   const body = { prompt, teamId }
+  // 팀 경로는 지금 풀고 있는 챌린지를 함께 보내 서버의 진행 중 챌린지와 대조받는다
+  if (challengeId) body.challengeId = challengeId
   if (repair?.previousCode) {
     body.repair = {
       previousCode: repair.previousCode,
@@ -71,17 +78,22 @@ export async function generateCode(prompt, teamId = null, repair = null) {
     body: JSON.stringify(body),
   })
   if (!res.ok) throw await toReadableError(res)
-  return res.json()  // { code }
+  const data = await res.json()
+  // codeSig — 서버가 만든 코드라는 서명. /api/evaluate에 code와 함께 그대로 돌려줘야 한다
+  return { code: data?.code, codeSig: data?.codeSig ?? null }
 }
 
 /**
- * 프롬프트 품질 평가 (Sonnet)
+ * 프롬프트 품질 평가 (서버 MODEL_EVALUATE — 2026-10-27 현재 claude-sonnet-5-5)
  */
-export async function evaluatePrompt({ prompt, generatedCode, targetCode, challengeId, sessionNumber, teamId }) {
+export async function evaluatePrompt({ prompt, generatedCode, codeSig, targetCode, challengeId, sessionNumber, teamId }) {
+  // codeSig: generateCode가 돌려준 서명. 팀 경로는 필수다(없거나 코드와 다르면 400 invalid_code_sig)
+  const body = { prompt, generatedCode, targetCode, challengeId, sessionNumber, teamId }
+  if (codeSig) body.codeSig = codeSig
   const res = await fetch(`${BASE}/evaluate`, {
     method: 'POST',
     headers: getHeaders(teamId),
-    body: JSON.stringify({ prompt, generatedCode, targetCode, challengeId, sessionNumber, teamId }),
+    body: JSON.stringify(body),
   })
   if (!res.ok) throw await toReadableError(res)
   return res.json()  // { score, ct_scores, feedback, strengths, improvements }
