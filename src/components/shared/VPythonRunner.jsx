@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { buildGlowScriptHTML, checkCodeSafety, ANIMATION_GUIDE } from '../../utils/glowscript.js'
 
+// 탭이 숨겨져 있는지 (다른 탭을 보고 있거나 창이 가려진 상태)
+function isPageHidden() {
+  return typeof document !== 'undefined' && document.visibilityState === 'hidden'
+}
+
 // 주 입력 장치가 손가락(터치)인지 — 회전 안내 문구를 기기에 맞춰 바꾼다
 function isCoarsePointer() {
   try {
@@ -76,6 +81,12 @@ export default function VPythonRunner({
   // srcdoc + runId — 같은 코드를 다시 실행해도 key가 바뀌어 iframe이 새로 만들어진다
   const [frame, setFrame] = useState(null) // { html, runId } | null
   const runIdRef = useRef(0)
+  // 탭이 숨겨진 동안 들어온 실행 요청 — 탭이 다시 보이면 그때 iframe을 만든다.
+  // 숨겨진 탭에서 만든 장면은 탭을 다시 열어도 WebGL 화면이 회색으로 비어 있고 새로고침해야 보였다.
+  const deferredCodeRef = useRef(null)
+  // 장면을 그리는 도중(loading)에 탭이 숨겨졌는지 — 보이게 되면 같은 코드로 다시 그린다
+  const rerunOnVisibleRef = useRef(false)
+  const lastRunCodeRef = useRef(null)
   const [error, setError] = useState(null)
   const [errorKind, setErrorKind] = useState(null) // syntax | runtime | resource | timeout | animation | loop
   const [status, setStatus] = useState('idle') // idle | loading | ready | error
@@ -146,6 +157,15 @@ export default function VPythonRunner({
     }
 
     applyStatus('loading')
+    lastRunCodeRef.current = c
+    rerunOnVisibleRef.current = false
+    // 숨겨진 탭에서는 iframe을 만들지 않는다 (교사가 챌린지를 시작할 때 학생이 다른 탭을 보고 있던 경우)
+    if (isPageHidden()) {
+      deferredCodeRef.current = c
+      setFrame(null)
+      return
+    }
+    deferredCodeRef.current = null
     try {
       runIdRef.current += 1
       setFrame({ html: buildGlowScriptHTML(c), runId: runIdRef.current })
@@ -155,18 +175,25 @@ export default function VPythonRunner({
     }
   }, [applyStatus, reportError, armWatchdog, clearWatchdog])
 
-  // 탭이 다시 보이면 로딩 중인 장면의 watchdog을 새로 건다 (백그라운드 오발동 방지)
+  // 탭이 다시 보이면: 숨겨진 동안 미룬 장면을 지금 만들고, 그리다가 숨겨진 장면은 다시 그린다.
+  // 로딩 중인 장면의 watchdog도 새로 건다 (백그라운드 오발동 방지)
   useEffect(() => {
     const onVisibility = () => {
       if (document.visibilityState === 'hidden') {
         clearWatchdog()
+        if (statusRef.current === 'loading' && !deferredCodeRef.current) rerunOnVisibleRef.current = true
+        return
+      }
+      const pending = deferredCodeRef.current || (rerunOnVisibleRef.current ? lastRunCodeRef.current : null)
+      if (pending) {
+        run(pending)
       } else if (statusRef.current === 'loading') {
         armWatchdog()
       }
     }
     document.addEventListener('visibilitychange', onVisibility)
     return () => document.removeEventListener('visibilitychange', onVisibility)
-  }, [armWatchdog, clearWatchdog])
+  }, [armWatchdog, clearWatchdog, run])
 
   // postMessage 이벤트 수신
   useEffect(() => {
@@ -179,6 +206,8 @@ export default function VPythonRunner({
       if (!mine || e.source !== mine) return
 
       if (e.data.type === 'glowscript:ready') {
+        // 숨겨진 상태에서 끝난 장면은 보이게 될 때 한 번 더 그린다 (rerunOnVisibleRef 유지)
+        if (!isPageHidden()) rerunOnVisibleRef.current = false
         clearWatchdog()
         applyStatus('ready')
         setError(null)
@@ -201,6 +230,8 @@ export default function VPythonRunner({
       return
     }
     // 코드가 비었거나(다음 챌린지 등) 자동 실행이 꺼졌으면 이전 장면·오류 상태를 모두 초기화한다
+    deferredCodeRef.current = null
+    rerunOnVisibleRef.current = false
     clearWatchdog()
     applyStatus('idle')
     setFrame(null)
@@ -362,7 +393,7 @@ export default function VPythonRunner({
       <div style={{ fontSize: '0.78rem', color: 'var(--muted)', marginTop: '4px', lineHeight: 1.4, wordBreak: 'keep-all' }}>
         {coarsePointer
           ? '한 손가락으로 끌어 회전, 두 손가락으로 확대·축소'
-          : '마우스 오른쪽 버튼(또는 Ctrl+드래그)으로 회전, 휠로 확대·축소'}
+          : '오른쪽 버튼이나 Ctrl을 누른 채 끌면 회전, 휠로 확대·축소 (맥 트랙패드: Ctrl+클릭한 채 끌기)'}
       </div>
     </div>
   )

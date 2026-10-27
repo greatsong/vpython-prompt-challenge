@@ -382,6 +382,16 @@ export function buildGlowScriptHTML(code) {
   window.addEventListener('resize', function () { window.__gsFit(); });
 
   document.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+
+  // Ctrl+드래그(회전)·Shift+드래그(이동)·Alt+드래그(확대) — glow는 수정 키 상태를 이 문서의 keydown으로만 갱신한다.
+  // 장면 mousedown은 glow가 preventDefault해 iframe이 키보드 포커스를 받지 못하므로 Ctrl 키 입력이 부모 페이지로 간다.
+  // 그래서 마우스 이벤트 자체의 수정 키 값을 glow 처리기보다 먼저(캡처 단계) 옮겨 둔다.
+  ['mousedown', 'mousemove'].forEach(function (t) {
+    document.addEventListener(t, function (e) {
+      var m = window.__gsScene && window.__gsScene.mouse;
+      if (m) { m.ctrl = !!e.ctrlKey; m.alt = !!e.altKey; m.shift = !!e.shiftKey; }
+    }, true);
+  });
 })();
 <\/script>
 </head>
