@@ -4,36 +4,20 @@ import SessionController from './SessionController.jsx'
 import ClassDashboard from './ClassDashboard.jsx'
 import TeacherGuide from './TeacherGuide.jsx'
 import { Link } from 'react-router-dom'
-import { setTeacherToken, getTeacherToken, clearTeacherToken, teacherFetch, setTeacherScope, getTeacherScope } from '../../utils/teacherAuth.js'
+import {
+  setTeacherToken, getTeacherToken, clearTeacherToken, teacherFetch, setTeacherScope, getTeacherScope,
+  loadTeacherSession, saveTeacherSession, clearTeacherSession, migrateLegacyTeacherSession,
+} from '../../utils/teacherAuth.js'
 import { createSocket } from '../../utils/socket.js'
 
 const AUTH_KEY = 'vpython_teacher_auth'
 const INACCESSIBLE_SESSION_NOTICE = '이 수업에 접근할 수 없어 새 수업 준비 화면으로 이동합니다'
-// 진행 중인 수업 정보 — 새로고침·재접속 후에도 같은 세션으로 복귀하기 위해 localStorage에 보관
-const SESSION_KEY = 'vpython_teacher_session'
-
-function loadSavedSession() {
-  try {
-    const raw = localStorage.getItem(SESSION_KEY)
-    if (!raw) return null
-    const saved = JSON.parse(raw)
-    return saved?.sessionId ? saved : null
-  } catch {
-    return null
-  }
-}
-
-function saveSession(sessionId, teacherCode) {
-  try {
-    localStorage.setItem(SESSION_KEY, JSON.stringify({ sessionId, teacherCode }))
-  } catch { /* ignore */ }
-}
-
-function clearSavedSession() {
-  try {
-    localStorage.removeItem(SESSION_KEY)
-  } catch { /* ignore */ }
-}
+// 진행 중인 수업 정보 — 새로고침·재접속 후에도 같은 세션으로 복귀하기 위해 localStorage에 보관한다.
+// 저장 키는 토큰 범위별로 나뉜다(vpython_teacher_session:admin / :training). 운영 PIN과 연수 입장을
+// 같은 브라우저에서 오가도 서로의 수업을 덮어쓰지 않는다. 범위는 매 호출 시 sessionStorage에서 읽는다.
+const loadSavedSession = () => loadTeacherSession(getTeacherScope())
+const saveSession = (sessionId, teacherCode) => saveTeacherSession(sessionId, teacherCode, getTeacherScope())
+const clearSavedSession = () => clearTeacherSession(getTeacherScope())
 
 function TeacherGate({ onAuth }) {
   const [pin, setPin] = useState('')
@@ -53,6 +37,8 @@ function TeacherGate({ onAuth }) {
       if (res.ok) {
         const data = await res.json()
         if (data.token) setTeacherToken(data.token)
+        // 범위를 바꾸기 전에 예전 공용 키를 운영(admin) 키로 옮겨 둔다
+        migrateLegacyTeacherSession()
         setTeacherScope(data.scope || 'admin')
         sessionStorage.setItem(AUTH_KEY, Date.now().toString())
         onAuth()

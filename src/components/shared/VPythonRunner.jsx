@@ -1,6 +1,16 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { buildGlowScriptHTML, checkCodeSafety, ANIMATION_GUIDE } from '../../utils/glowscript.js'
 
+// 주 입력 장치가 손가락(터치)인지 — 회전 안내 문구를 기기에 맞춰 바꾼다
+function isCoarsePointer() {
+  try {
+    return typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      && window.matchMedia('(pointer: coarse)').matches
+  } catch {
+    return false
+  }
+}
+
 /**
  * 에러 종류별 학생 안내 문구.
  * 'syntax'는 AI가 만든 코드 자체가 깨진 경우라 네트워크 안내를 하면 안 된다.
@@ -70,6 +80,23 @@ export default function VPythonRunner({
   const [errorKind, setErrorKind] = useState(null) // syntax | runtime | resource | timeout | animation | loop
   const [status, setStatus] = useState('idle') // idle | loading | ready | error
   const [retryCount, setRetryCount] = useState(0)
+  // 터치 기기 여부 — 마우스를 연결하거나 떼면 바뀔 수 있어 변경도 따라간다
+  const [coarsePointer, setCoarsePointer] = useState(isCoarsePointer)
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return undefined
+    let mq
+    try { mq = window.matchMedia('(pointer: coarse)') } catch { return undefined }
+    const onChange = () => setCoarsePointer(mq.matches)
+    if (typeof mq.addEventListener === 'function') {
+      mq.addEventListener('change', onChange)
+      return () => mq.removeEventListener('change', onChange)
+    }
+    if (typeof mq.addListener === 'function') {
+      mq.addListener(onChange)
+      return () => mq.removeListener(onChange)
+    }
+    return undefined
+  }, [])
 
   const applyStatus = useCallback((next) => {
     statusRef.current = next
@@ -333,7 +360,9 @@ export default function VPythonRunner({
       </div>
       {/* 앞뒤 깊이는 기본 카메라(정면에서 약간 위)만으로 보기 어려울 수 있어, 회전 방법을 장면 아래에 안내한다 */}
       <div style={{ fontSize: '0.78rem', color: 'var(--muted)', marginTop: '4px', lineHeight: 1.4, wordBreak: 'keep-all' }}>
-        마우스 오른쪽 버튼(또는 Ctrl+드래그)으로 회전, 휠로 확대·축소
+        {coarsePointer
+          ? '한 손가락으로 끌어 회전, 두 손가락으로 확대·축소'
+          : '마우스 오른쪽 버튼(또는 Ctrl+드래그)으로 회전, 휠로 확대·축소'}
       </div>
     </div>
   )

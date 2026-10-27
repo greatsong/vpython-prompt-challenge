@@ -886,6 +886,7 @@ export default function BattleMode({ team, socket, rankings, challengeEnded, rem
         />
 
         <button
+          className="battle-submit"
           onClick={handleSubmit}
           disabled={loading || !prompt.trim() || challengeEnded}
           style={{

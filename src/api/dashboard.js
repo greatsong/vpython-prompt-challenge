@@ -115,6 +115,21 @@ router.get('/dashboard/:sessionId', requireTeacher, requireSessionAccess('sessio
       )
       .all(team.id)
 
+    // 지난 라운드 최고 점수 — 현재 라운드(이번에 시작한 챌린지 회차)의 시도를 뺀 나머지 중 최고점.
+    // 다른 챌린지 점수와 같은 챌린지의 이전 회차 점수가 모두 여기에 들어간다.
+    // 교사 화면 팀 카드의 보조 줄("지난 라운드 최고 94점")에만 쓰고, 현재 상태 표시에는 섞지 않는다.
+    const previous = challengeId
+      ? req.db
+          .prepare(
+            `SELECT MAX(score) AS score
+             FROM attempts a
+             WHERE team_id = ? AND NOT (a.challenge_id = ?${round.sql})`
+          )
+          .get(team.id, challengeId, ...round.params)
+      : req.db
+          .prepare('SELECT MAX(score) AS score FROM attempts WHERE team_id = ?')
+          .get(team.id)
+
     return {
       id: team.id,
       session_id: team.session_id,
@@ -125,6 +140,7 @@ router.get('/dashboard/:sessionId', requireTeacher, requireSessionAccess('sessio
       hasSubmitted: !!(current?.score !== null && current?.score !== undefined),
       lastSubmitTime: current?.created_at ?? null,
       perChallenge,
+      previousBest: previous?.score ?? null,
     }
   })
 

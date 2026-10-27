@@ -307,8 +307,8 @@ export default function SessionController({ sessionId, onFinalEnd, onAuthExpired
     ? Math.max(0, submissionProgress.total - submissionProgress.submitted)
     : 0
 
-  // 아직 평가가 안 끝난 팀이 있으면 안내만 한다 (버튼은 막지 않는다 — 교사가 의도적으로 넘길 수 있어야 한다)
-  const pendingNotice = pendingTeams > 0 && (
+  // 진행 중: 아직 평가가 안 끝난 팀이 있으면 안내만 한다 (버튼은 막지 않는다 — 교사가 의도적으로 마감할 수 있어야 한다)
+  const pendingNotice = status === 'running' && pendingTeams > 0 && (
     <p style={{
       padding: '8px 10px',
       background: 'var(--warning-bg)',
@@ -320,9 +320,28 @@ export default function SessionController({ sessionId, onFinalEnd, onAuthExpired
       lineHeight: 1.5,
       textAlign: 'center',
     }}>
-      ⚠️ {submissionProgress.submitted} / {submissionProgress.total}팀 제출 —
-      {pendingTeams}팀 미제출.
-      제출 중인 팀이 있다면 지금 넘길 때 결과가 빠질 수 있어요.
+      ⚠️ {submissionProgress.submitted} / {submissionProgress.total}팀 제출, {pendingTeams}팀 미제출.
+      제출 중인 팀이 있다면 지금 마감할 때 결과가 빠질 수 있습니다.
+    </p>
+  )
+
+  // 마감 뒤: 더 받을 제출이 없으므로 경고 대신 다음 할 일을 안내한다
+  const endedNotice = status === 'ended' && (
+    <p style={{
+      padding: '8px 10px',
+      background: 'var(--card)',
+      border: '1px solid var(--border)',
+      borderRadius: 'var(--radius)',
+      color: 'var(--text-muted)',
+      fontSize: '0.6875rem',
+      fontWeight: 600,
+      lineHeight: 1.5,
+      textAlign: 'center',
+    }}>
+      {progressMatches && submissionProgress.total > 0 && (
+        <>{submissionProgress.submitted} / {submissionProgress.total}팀 제출. </>
+      )}
+      제출이 마감되었습니다. 결과를 공개하거나 다음 챌린지를 시작하세요.
     </p>
   )
 
@@ -590,7 +609,7 @@ export default function SessionController({ sessionId, onFinalEnd, onAuthExpired
             }}>
               {selected?.emoji} {selected?.title} — 마감됨
             </div>
-            {pendingNotice}
+            {endedNotice}
             <button
               onClick={nextChallenge}
               style={{

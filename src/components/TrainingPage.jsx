@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { setTeacherToken, setTeacherScope } from '../utils/teacherAuth.js'
+import { setTeacherToken, setTeacherScope, migrateLegacyTeacherSession } from '../utils/teacherAuth.js'
 
 // TeacherApp.jsx의 PIN 로그인과 같은 키 — 교사 화면이 이 값을 함께 확인한다
 const AUTH_KEY = 'vpython_teacher_auth'
@@ -60,10 +60,13 @@ export default function TrainingPage() {
       })
       const data = await res.json().catch(() => ({}))
       if (res.ok && data.token) {
+        // 예전 공용 키(vpython_teacher_session)에 남은 수업은 운영 교사의 것으로 보고 admin 키로 옮긴다.
+        // 연수 화면은 vpython_teacher_session:training 키만 읽고 쓰므로 운영 수업을 덮어쓰지 않는다.
+        migrateLegacyTeacherSession()
         setTeacherToken(data.token)
         setTeacherScope(data.scope || 'training')
         sessionStorage.setItem(AUTH_KEY, Date.now().toString())
-        // 저장된 수업은 지우지 않는다 — 같은 traineeId면 서버가 자기 수업으로 이어 준다.
+        // 저장된 연수 수업은 지우지 않는다. 같은 traineeId면 서버가 자기 수업으로 이어 준다.
         // 접근할 수 없는 수업이면 교사 화면의 복원 단계가 안내 후 정리한다.
         navigate('/teacher', { replace: true })
         return

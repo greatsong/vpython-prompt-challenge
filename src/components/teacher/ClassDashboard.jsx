@@ -33,6 +33,41 @@ function displayRanks(rankings) {
   })
 }
 
+// 팀 카드의 현재 라운드 상태.
+// hasSubmitted·latestScore는 서버가 현재 챌린지의 이번 라운드(challenge_rounds 시작 시각 이후)만 집계한 값이다.
+//  'submitted' 이번 라운드에 제출함 → 점수 표시
+//  'writing'   미제출 + 진행 중 → 작성 중
+//  'missed'    미제출 + 마감 → 미제출(점수 없음)
+//  'idle'      챌린지를 시작하기 전 → 대기 중
+// dataFresh: 화면의 teams가 지금 챌린지 기준으로 다시 불러온 값인지. 아니면 제출 여부를 믿지 않는다.
+function teamRoundState(team, challengeStatus, dataFresh = true) {
+  if (challengeStatus === 'idle') return 'idle'
+  if (dataFresh && team?.hasSubmitted) return 'submitted'
+  if (challengeStatus === 'running') return 'writing'
+  if (challengeStatus === 'ended') return 'missed'
+  return 'idle'
+}
+
+// 카드 보조 줄의 "지난 라운드 최고 점수".
+// 서버의 previousBest(이번 라운드를 뺀 모든 시도의 최고점)를 우선 쓰고,
+// 이전 서버 응답에는 없으므로 perChallenge에서 현재 챌린지를 뺀 최고점으로 대신한다.
+// 시작 전(idle)에는 이번 라운드라고 볼 회차가 없으므로 그 회차 점수도 지난 기록에 넣는다.
+function previousBestScore(team, includeCurrentRound, currentChallengeId) {
+  let best = null
+  const take = (v) => {
+    if (typeof v === 'number' && Number.isFinite(v) && (best === null || v > best)) best = v
+  }
+  if (team && 'previousBest' in team) {
+    take(team.previousBest)
+  } else {
+    for (const pc of team?.perChallenge || []) {
+      if (pc.challenge_id !== currentChallengeId) take(pc.score)
+    }
+  }
+  if (includeCurrentRound && team?.hasSubmitted) take(team.latestScore)
+  return best
+}
+
 // TeacherApp의 인증 플래그 키 (TeacherApp.jsx의 AUTH_KEY와 같아야 한다)
 const TEACHER_AUTH_KEY = 'vpython_teacher_auth'
 
@@ -955,59 +990,40 @@ export default function ClassDashboard({ sessionId, onAuthExpired }) {
                 {(team.members || []).join(', ')}
               </div>
 
-              {/* 점수 표시: 현재 챌린지 점수 크게 + 이전 챌린지 뱃지 */}
-              {team.hasSubmitted ? (
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                    <span style={{ color: 'var(--success-text)', background: 'var(--success-bg)', padding: '1px 8px', borderRadius: 'var(--radius-pill)', fontSize: '0.7rem', fontWeight: 700 }}>✓ 제출 완료</span>
-                    <span style={{ fontSize: '1.125rem', fontWeight: 800, color: team.color }}>
-                      {team.latestScore}점
-                    </span>
-                  </div>
-                  {/* 이전 챌린지 점수 뱃지 (현재 챌린지 제외) */}
-                  {team.perChallenge?.filter(pc => pc.challenge_id !== currentChallenge?.id).length > 0 && (
-                    <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                      {team.perChallenge.filter(pc => pc.challenge_id !== currentChallenge?.id).map((pc, idx) => (
-                        <span key={idx} style={{
-                          padding: '2px 8px',
-                          borderRadius: 'var(--radius-pill)',
-                          fontSize: '0.6875rem',
-                          fontWeight: 700,
-                          background: 'var(--surface2)',
-                          color: 'var(--text-muted)',
-                        }}>
-                          {pc.score}
-                        </span>
-                      ))}
+              {/* 현재 라운드 상태 — 제출함: 점수 / 미제출+진행 중: 작성 중 / 미제출+마감: 미제출.
+                  이전 라운드 점수는 상태 줄에 섞지 않고 아래 보조 줄로만 보여 준다 */}
+              {(() => {
+                const state = teamRoundState(team, challengeStatus, progressReady)
+                const prevBest = previousBestScore(team, state === 'idle', currentChallenge?.id)
+                return (
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', minHeight: '24px' }}>
+                      {state === 'submitted' && (
+                        <>
+                          <span style={{ color: 'var(--success-text)', background: 'var(--success-bg)', padding: '1px 8px', borderRadius: 'var(--radius-pill)', fontSize: '0.7rem', fontWeight: 700 }}>✓ 제출 완료</span>
+                          <span style={{ fontSize: '1.125rem', fontWeight: 800, color: team.color }}>
+                            {team.latestScore}점
+                          </span>
+                        </>
+                      )}
+                      {state === 'writing' && (
+                        <span style={{ color: 'var(--accent-text)', background: 'var(--card)', border: '1px solid var(--gold)', padding: '1px 8px', borderRadius: 'var(--radius-pill)', fontSize: '0.7rem', fontWeight: 700 }}>✏️ 작성 중</span>
+                      )}
+                      {state === 'missed' && (
+                        <span style={{ color: 'var(--text-muted)', background: 'var(--surface2)', padding: '1px 8px', borderRadius: 'var(--radius-pill)', fontSize: '0.7rem', fontWeight: 700 }}>미제출</span>
+                      )}
+                      {state === 'idle' && (
+                        <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>⋯ 대기 중</span>
+                      )}
                     </div>
-                  )}
-                </div>
-              ) : team.perChallenge?.length > 0 ? (
-                <div>
-                  <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
-                    미제출
-                  </span>
-                  {/* 이전 챌린지 점수 뱃지만 */}
-                  <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '4px' }}>
-                    {team.perChallenge.filter(pc => pc.challenge_id !== currentChallenge?.id).map((pc, idx) => (
-                      <span key={idx} style={{
-                        padding: '2px 8px',
-                        borderRadius: 'var(--radius-pill)',
-                        fontSize: '0.6875rem',
-                        fontWeight: 700,
-                        background: 'var(--surface2)',
-                        color: 'var(--text-muted)',
-                      }}>
-                        {pc.score}
-                      </span>
-                    ))}
+                    {prevBest !== null && (
+                      <div style={{ marginTop: '4px', fontSize: '0.6875rem', color: 'var(--text-muted)' }}>
+                        지난 라운드 최고 {prevBest}점
+                      </div>
+                    )}
                   </div>
-                </div>
-              ) : (
-                <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
-                  ⋯ 대기 중
-                </span>
-              )}
+                )
+              })()}
             </div>
           )
         })}

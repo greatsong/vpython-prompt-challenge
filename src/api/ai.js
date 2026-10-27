@@ -461,6 +461,11 @@ function categoryMaxForClient(rubric) {
   return base
 }
 
+// 피드백·잘한 점·개선 제안 문장에 쓰지 않는 표현 (교재 문체 규칙과 같다). 두 채점 프롬프트가 함께 쓴다.
+export const FEEDBACK_BANNED_EXPRESSIONS =
+  "다음 표현은 사용하지 않는다: 견주다(견주어·견준 포함, 대신 '비교하다'), 그냥, 쓰다(대신 '사용하다'), " +
+  "뜨다(대신 '표시되다'), 재다(대신 '측정하다'·'계산하다'), 대시(—)로 문장 잇기(마침표로 끊는다)."
+
 // 채점 AI가 피드백에 정답 코드를 흘리는 것을 막는 최후 방어선.
 // 프롬프트로도 금지하지만, 만에 하나 새어 나오면 여기서 지운다.
 const CODE_CALL_LEAK_RE = /\b(sphere|box|cylinder|cone|arrow|ring|ellipsoid|pyramid|vec)\s*\([^)]*\)?/gi
@@ -475,10 +480,36 @@ function scrubCodeLeak(text) {
     .replace(CODE_PARAM_LEAK_RE, '(코드 생략)')
 }
 
+// 채점 프롬프트에 금지 표현 목록을 넣어도 모델이 가끔 '견주어 보세요'처럼 쓴다.
+// 뜻이 바뀌지 않고 활용형이 확실한 '견주다' 계열만 '비교하다'로 바꾼다.
+// (그냥·쓰다·뜨다·재다·대시는 문맥에 따라 뜻이 달라 기계적으로 바꾸면 문장이 망가지므로 프롬프트 규칙으로만 막는다)
+// 순서가 중요하다: '견주어'를 '견주'보다 먼저 바꿔야 '비교하어'가 생기지 않는다.
+const BANNED_EXPRESSION_REPLACEMENTS = [
+  [/견주어 보/g, '비교해 보'],
+  [/견주어/g, '비교해'],
+  [/견줘/g, '비교해'],
+  [/견줬/g, '비교했'],
+  [/견준/g, '비교한'],
+  [/견줄/g, '비교할'],
+  [/견줍/g, '비교합'],
+  [/견주/g, '비교하'],
+]
+
+export function replaceBannedExpressions(text) {
+  if (typeof text !== 'string') return text
+  let out = text
+  for (const [re, to] of BANNED_EXPRESSION_REPLACEMENTS) out = out.replace(re, to)
+  return out
+}
+
+function scrubText(text) {
+  return replaceBannedExpressions(scrubCodeLeak(text))
+}
+
 function scrubEvaluationText(evaluation) {
-  evaluation.feedback = scrubCodeLeak(evaluation.feedback)
-  if (Array.isArray(evaluation.strengths)) evaluation.strengths = evaluation.strengths.map(scrubCodeLeak)
-  if (Array.isArray(evaluation.improvements)) evaluation.improvements = evaluation.improvements.map(scrubCodeLeak)
+  evaluation.feedback = scrubText(evaluation.feedback)
+  if (Array.isArray(evaluation.strengths)) evaluation.strengths = evaluation.strengths.map(scrubText)
+  if (Array.isArray(evaluation.improvements)) evaluation.improvements = evaluation.improvements.map(scrubText)
   return evaluation
 }
 
@@ -992,6 +1023,7 @@ ${anchorsList}
    허용: "각 부분이 어디에 위치하는지 관찰해보세요", "부분 간 크기를 비교해보세요"
 4. 정답 코드·수치·좌표·API 이름을 절대 노출하지 마세요.
 5. 사고 전략을 제안하세요 (예: "전체를 부분으로 나눠서 각각 묘사해보세요", "기준점 하나를 정하고 다른 부분을 그 기준에 대해 서술해보세요")
+6. ${FEEDBACK_BANNED_EXPRESSIONS}
 
 JSON만 응답:
 {
@@ -1027,6 +1059,7 @@ CT 사고력 보너스 15점은 서버가 규칙으로 따로 계산하므로 ct
 
 피드백 규칙: 구체적 정답을 알려주지 말고, 구조/공간/비율 축의 결손을 먼저 짚고 사고 방향만 제안하세요.
 정답 코드·수치·API 이름은 절대 노출하지 마세요.
+${FEEDBACK_BANNED_EXPRESSIONS}
 
 JSON만 응답:
 {"format_violation":false,"score":0~100,"category_scores":{"structure":0,"spatial":0,"proportion":0,"shape":0,"color":0},"element_scores":{},"feedback":"2줄 피드백","strengths":["잘한 점"],"improvements":["개선 사고 방향"]}

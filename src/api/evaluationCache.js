@@ -28,8 +28,9 @@ import { createHash } from 'crypto'
  *  v3-2026-10-sonnet55: 채점 모델 Sonnet 4.6 → Sonnet 5.5 전환(2026-10-27)
  *  v4-2026-10-27-rubric: 루브릭·목표 코드 수정 + 채점 프롬프트에서 학생 프롬프트를 <student_prompt> 태그로 감싸 끝에 배치(2026-10-27)
  *  v5-2026-10-27-final: 앵커 기준선을 앵커 자체 CT로 계산, 기준점을 해석 예시로 낮춤, 형식 제재를 서버 규칙으로만 한정,
- *                       요소명 게이트 완화, CT 한 글자 이름·문장 분할 수정(2026-10-27) */
-export const EVAL_CACHE_VERSION = 'v5-2026-10-27-final'
+ *                       요소명 게이트 완화, CT 한 글자 이름·문장 분할 수정(2026-10-27)
+ *  v6-2026-10-27-feedback: 피드백 금지 표현 규칙(견주다·그냥·쓰다·뜨다·재다·대시) 추가와 서버 후처리 치환(2026-10-27) */
+export const EVAL_CACHE_VERSION = 'v6-2026-10-27-feedback'
 
 const CREATE_TABLE_SQL = `
   CREATE TABLE IF NOT EXISTS evaluation_cache (

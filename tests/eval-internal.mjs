@@ -9,8 +9,8 @@
 import assert from 'node:assert/strict'
 import { RUBRICS } from '../src/server-data/rubrics.js'
 import { BATTLE_CHALLENGES } from '../src/server-data/challenges.js'
-import { normalizeEvaluation, stripCodeFence, extractText, wrapUntrusted, EVALUATE_CACHE_TAG, MODEL_EVALUATE } from '../src/api/ai.js'
-import { buildCacheKey } from '../src/api/evaluationCache.js'
+import { normalizeEvaluation, stripCodeFence, extractText, wrapUntrusted, EVALUATE_CACHE_TAG, MODEL_EVALUATE, replaceBannedExpressions, FEEDBACK_BANNED_EXPRESSIONS } from '../src/api/ai.js'
+import { buildCacheKey, EVAL_CACHE_VERSION } from '../src/api/evaluationCache.js'
 import {
   createEvaluationProof,
   verifyEvaluationProof,
@@ -293,6 +293,34 @@ test('CT counts one-letter part names only at word boundaries and splits sentenc
   assert.equal(scoreCT('구조가 단계적인 입체 배열이다. 추가로 설명한다.').breakdown.part, 0)
   assert.equal(scoreCT('작은 구가 위에 있다. 큰 추가 왼쪽에 매달려 있다.').breakdown.part, 2)
   assert.equal(scoreCT('3층으로 쌓았다\n위층이 좁다').breakdown.sentence, 3)
+})
+
+test('feedback banned expressions: 견주다 family is rewritten to 비교하다 safely', () => {
+  const cases = [
+    ['두 부분의 크기를 견주어 보세요.', '두 부분의 크기를 비교해 보세요.'],
+    ['높이를 견주어서 설명하면 좋습니다.', '높이를 비교해서 설명하면 좋습니다.'],
+    ['기둥과 견주면 판이 얇습니다.', '기둥과 비교하면 판이 얇습니다.'],
+    ['서로 견주는 표현이 빠졌습니다.', '서로 비교하는 표현이 빠졌습니다.'],
+    ['크기를 견줘 보세요.', '크기를 비교해 보세요.'],
+    ['기준과 견준 설명이 좋습니다.', '기준과 비교한 설명이 좋습니다.'],
+    ['무엇과 견줄지 정하세요.', '무엇과 비교할지 정하세요.'],
+    ['길이를 견줬습니다.', '길이를 비교했습니다.'],
+    ['부분끼리 견주다 보면 보입니다.', '부분끼리 비교하다 보면 보입니다.'],
+  ]
+  for (const [input, expected] of cases) assert.equal(replaceBannedExpressions(input), expected)
+  // 다른 문장·비문자열은 그대로 둔다
+  assert.equal(replaceBannedExpressions('위아래 관계가 모호합니다.'), '위아래 관계가 모호합니다.')
+  assert.equal(replaceBannedExpressions(null), null)
+  assert.equal(replaceBannedExpressions(undefined), undefined)
+  // 결과에 '견주' 계열이 남지 않는다
+  assert.doesNotMatch(replaceBannedExpressions(cases.map(([i]) => i).join(' ')), /견[주준줄줍줘줬]/)
+})
+
+test('feedback banned expressions: prompt rule lists every banned word and cache version is bumped', () => {
+  for (const word of ['견주다', '그냥', '쓰다', '뜨다', '재다', '—']) {
+    assert.ok(FEEDBACK_BANNED_EXPRESSIONS.includes(word), `missing ${word}`)
+  }
+  assert.equal(EVAL_CACHE_VERSION, 'v6-2026-10-27-feedback')
 })
 
 if (process.exitCode) {
